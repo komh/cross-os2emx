@@ -1,0 +1,17 @@
+#!/bin/sh
+
+for sub in binutils-os2 gcc-os2 libc ; do
+  echo "Initializing submodule $sub..."
+  git submodule update --init $sub || exit 1
+
+  echo "Applying patches for $sub..."
+  gitam_opt="-3"
+  if test "$sub" == "libc" ; then
+    gitam_opt="$gitam_opt --keep-cr"
+  fi
+  ( cd $sub && git am $gitam_opt ../patches/$sub/* ) || exit 1
+
+  echo
+done
+
+echo "Done."
