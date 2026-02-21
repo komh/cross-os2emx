@@ -2,3 +2,7 @@
 	path = binutils-os2
 	url = https://github.com/bitwiseworks/binutils-os2.git
 	branch = master
+[submodule "gcc-os2"]
+	path = gcc-os2
+	url = https://github.com/bitwiseworks/gcc-os2.git
+	branch = master
