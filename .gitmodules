@@ -6,3 +6,7 @@
 	path = gcc-os2
 	url = https://github.com/bitwiseworks/gcc-os2.git
 	branch = master
+[submodule "libc"]
+	path = libc
+	url = https://github.com/bitwiseworks/libc.git
+	branch = master
