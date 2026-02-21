@@ -1,0 +1,4 @@
+# auto detect 'text' mode and use global setting of 'eol'
+* text=auto !eol
+
+/patches/libc/* -text

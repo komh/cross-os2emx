@@ -1,0 +1,135 @@
+From f74ff502a5fbfb7e3628b91dd0e04aec243f451a Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 14:59:32 +0900
+Subject: [PATCH 2/2] allow to cross-compile for *-os2-emx target
+
+---
+ bfd/i386aoutemx.c   |  2 +-
+ gas/as.c            | 52 ++++++++++++++++++++++++++++++++++++++++++---
+ gas/config/te-emx.h |  2 ++
+ 3 files changed, 52 insertions(+), 4 deletions(-)
+
+diff --git a/bfd/i386aoutemx.c b/bfd/i386aoutemx.c
+index 8f5b6aa1..f008e13b 100644
+--- a/bfd/i386aoutemx.c
++++ b/bfd/i386aoutemx.c
+@@ -163,7 +163,7 @@ static const struct aout_backend_data MY(backend_data) = {
+ #ifndef __EMX__
+ 
+ /* Cross-compilation support, borrowed from EMX C runtime library */
+-int _fseek_hdr PARAMS ((FILE *));
++int _fseek_hdr (FILE *);
+ 
+ int _fseek_hdr (FILE *stream)
+ {
+diff --git a/gas/as.c b/gas/as.c
+index 95cf49ce..79aad46b 100644
+--- a/gas/as.c
++++ b/gas/as.c
+@@ -53,8 +53,10 @@
+ 
+ #ifdef EMX
+ #undef abort
++#ifdef __EMX__
+ #include <process.h>
+ #include <io.h>
++#endif
+ #define abort()		as_abort (__FILE__, __LINE__, __PRETTY_FUNCTION__)
+ #endif
+ 
+@@ -140,7 +142,7 @@ static int flag_macro_alternate;
+ # include <sys/emxload.h>
+ #endif
+ #ifdef EMX
+-static char *omf_file_name;
++static const char *omf_file_name;
+ int emx_omf;                    /* -Zomf */
+ int emx_strip;                  /* -Zstrip */
+ #endif /* EMX */
+@@ -1212,6 +1214,50 @@ perform_an_assembly_pass (int argc, char ** argv)
+ }
+ 
+ 
++#ifdef __EMX__
++#define EXEEXT ".exe"
++#else
++#include <sys/wait.h>
++
++#define EXEEXT ""
++#define P_WAIT 0
++
++/* for spawnvp (P_WAIT) */
++static int spawnvp (int mode, const char *name, char * const argv[])
++{
++  int status;
++  int err;
++  int pid = fork();
++
++  /* Make compiler happy.  */
++  (void)mode;
++
++  if (pid == -1)
++    return -1;
++
++  if (pid == 0)
++    {
++      execvp (name, argv);
++      _exit (127);
++    }
++
++  while ((err = waitpid (pid, &status, 0)) == -1 && errno == EINTR)
++    /* nothing */;
++
++  if (err == -1)
++    return -1;
++
++  if (WIFSIGNALED (status))
++    return 128 + WTERMSIG (status);
++
++  if (WIFEXITED (status))
++    return WEXITSTATUS (status);
++
++  /* possible? */
++  return -1;
++}
++#endif
++
+ int
+ main (int argc, char ** argv)
+ {
+@@ -1452,7 +1498,7 @@ main (int argc, char ** argv)
+   if (keep_it && emx_omf)
+     {
+       int rc, i;
+-      char *args[6];
++      const char *args[6];
+ 
+       i = 0;
+       args[i++] = "emxomf";
+@@ -1462,7 +1508,7 @@ main (int argc, char ** argv)
+       args[i++] = omf_file_name;
+       args[i++] = out_file_name;
+       args[i] = NULL;
+-      rc = spawnvp (P_WAIT, "emxomf.exe", args);
++      rc = spawnvp (P_WAIT, "emxomf" EXEEXT, (char * const *) args);
+       remove (out_file_name);
+       if (rc < 0)
+         as_fatal ("cannot run emxomf");
+diff --git a/gas/config/te-emx.h b/gas/config/te-emx.h
+index a219ba8a..0af80599 100644
+--- a/gas/config/te-emx.h
++++ b/gas/config/te-emx.h
+@@ -1,8 +1,10 @@
+ #define TE_EMX
+ 
+ #undef abort
++#ifdef __EMX__
+ #include <process.h>
+ #include <io.h>
++#endif
+ #define abort()		as_abort (__FILE__, __LINE__, __PRETTY_FUNCTION__)
+ 
+ #if 0
+-- 
+2.28.0
+

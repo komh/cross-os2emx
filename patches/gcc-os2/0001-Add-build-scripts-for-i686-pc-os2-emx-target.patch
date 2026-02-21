@@ -1,0 +1,66 @@
+From 38fa4e94f850f25d3a225f5284edb0914237a738 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 16:03:00 +0900
+Subject: [PATCH 1/2] Add build scripts for i686-pc-os2-emx target
+
+---
+ conf-os2emx-cross | 31 +++++++++++++++++++++++++++++++
+ mk-os2emx-cross   |  8 ++++++++
+ 2 files changed, 39 insertions(+)
+ create mode 100755 conf-os2emx-cross
+ create mode 100755 mk-os2emx-cross
+
+diff --git a/conf-os2emx-cross b/conf-os2emx-cross
+new file mode 100755
+index 000000000..a46c91b5e
+--- /dev/null
++++ b/conf-os2emx-cross
+@@ -0,0 +1,31 @@
++#! /bin/sh
++
++PREFIXROOT=${PREFIXROOT:=$HOME}
++
++prefix=${PREFIXROOT%/}/opt/os2emx
++target=i686-pc-os2-emx
++
++export CFLAGS="-DEMX -O2"
++export CXXFLAGS="-DEMX -O2"
++
++opts="
++    --prefix=$prefix
++    --target=$target
++    --with-sysroot=$prefix/$target
++    --with-gcc-major-version-only
++    --with-gnu-as
++    --with-as=$prefix/bin/$target-as
++    --with-ld=$prefix/bin/$target-ld
++    --enable-languages=c,c++
++    --enable-threads
++    --disable-bootstrap
++    --disable-nls
++    --disable-ssp
++    --disable-libquadmath
++    --disable-multilib
++    --disable-lto
++    --disable-shared
++    --disable-symvers
++"
++
++$(dirname $0)/configure $opts "$@"
+diff --git a/mk-os2emx-cross b/mk-os2emx-cross
+new file mode 100755
+index 000000000..567461cab
+--- /dev/null
++++ b/mk-os2emx-cross
+@@ -0,0 +1,8 @@
++#!/bin/sh
++
++make all-gcc &&
++make install-gcc &&
++make all-target-libgcc &&
++make install-target-libgcc &&
++make all-target-libstdc++-v3 &&
++make install-target-libstdc++-v3
+-- 
+2.28.0
+

@@ -1,0 +1,1780 @@
+From afdb6dd279e1d9f9125bf7b605eaa573f3a210e4 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 22:17:31 +0900
+Subject: [PATCH 2/3] Port to 64-bit platforms
+
+---
+ src/emx/include/a_out.h         |  51 ++++---
+ src/emx/include/sys/omflib.h    |   2 +-
+ src/emx/src/emxbind/cmd.c       |   3 +-
+ src/emx/src/emxbind/emxbind.h   |   6 +-
+ src/emx/src/emxbind/exec.c      |   2 +-
+ src/emx/src/emxbind/export.c    |   2 +-
+ src/emx/src/emxbind/fixup.c     |   2 +-
+ src/emx/src/emxbind/map.c       |   4 +-
+ src/emx/src/emxbind/resource.c  |   4 +-
+ src/emx/src/emxexp/emxexp.c     |  12 +-
+ src/emx/src/emximp/emximp.c     |  90 ++++++------
+ src/emx/src/emxomf/emxomf.c     |  30 ++--
+ src/emx/src/emxomf/emxomf.h     |   6 +-
+ src/emx/src/emxomf/emxomfld.c   |   6 +-
+ src/emx/src/emxomf/grow.c       |   2 +-
+ src/emx/src/emxomf/listomf.c    |  88 +++++------
+ src/emx/src/emxomf/stabshll.c   |  54 +++----
+ src/emx/src/emxomf/weakld.c     |  16 +-
+ src/emx/src/include/defs.h      |   2 +-
+ src/emx/src/ld/ld.c             | 251 ++++++++++++++++++++++----------
+ src/emx/src/libomflib/omflib0.h |   4 +-
+ 21 files changed, 371 insertions(+), 266 deletions(-)
+
+diff --git a/src/emx/include/a_out.h b/src/emx/include/a_out.h
+index 4368077..de43383 100644
+--- a/src/emx/include/a_out.h
++++ b/src/emx/include/a_out.h
+@@ -6,18 +6,21 @@
+ 
+ #ifndef __A_OUT_GNU_H__
+ #define __A_OUT_GNU_H__
++
++#include <stdint.h>
++
+ #define __GNU_EXEC_MACROS__
+ #ifndef __STRUCT_EXEC_OVERRIDE__
+ struct exec
+ {
+-  unsigned long a_info;		/* Use macros N_MAGIC, etc for access */
+-  unsigned a_text;		/* length of text, in bytes */
+-  unsigned a_data;		/* length of data, in bytes */
+-  unsigned a_bss;		/* length of uninitialized data area for file, in bytes */
+-  unsigned a_syms;		/* length of symbol table data in file, in bytes */
+-  unsigned a_entry;		/* start address */
+-  unsigned a_trsize;		/* length of relocation info for text, in bytes */
+-  unsigned a_drsize;		/* length of relocation info for data, in bytes */
++  uint32_t a_info;		/* Use macros N_MAGIC, etc for access */
++  uint32_t a_text;		/* length of text, in bytes */
++  uint32_t a_data;		/* length of data, in bytes */
++  uint32_t a_bss;		/* length of uninitialized data area for file, in bytes */
++  uint32_t a_syms;		/* length of symbol table data in file, in bytes */
++  uint32_t a_entry;		/* start address */
++  uint32_t a_trsize;	/* length of relocation info for text, in bytes */
++  uint32_t a_drsize;	/* length of relocation info for data, in bytes */
+ };
+ #endif /* __STRUCT_EXEC_OVERRIDE__ */
+ /* these go in the N_MACHTYPE field */
+@@ -87,16 +90,26 @@ enum machine_type {
+ /* Address of bss segment in memory after it is loaded.  */
+ #define N_BSSADDR(x) (N_DATADDR(x) + (x).a_data)
+ 
++struct ninfo {
++  union {
++    int32_t n_strx;
++  } n_un;
++  uint8_t n_type;
++  int8_t n_other;
++  int16_t n_desc;
++  uint32_t n_value;
++};
++
+ struct nlist {
+   union {
+     char *n_name;
+     struct nlist *n_next;
+-    long n_strx;
++    int32_t n_strx;
+   } n_un;
+-  unsigned char n_type;
+-  char n_other;
+-  short n_desc;
+-  unsigned long n_value;
++  uint8_t n_type;
++  int8_t n_other;
++  int16_t n_desc;
++  uintptr_t n_value;
+ };
+ #define N_UNDF 0
+ #define N_ABS 2
+@@ -150,26 +163,26 @@ struct nlist {
+ struct relocation_info
+ {
+   /* Address (within segment) to be relocated.  */
+-  int r_address;
++  int32_t r_address;
+   /* The meaning of r_symbolnum depends on r_extern.  */
+-  unsigned int r_symbolnum:24;
++  uint32_t r_symbolnum:24;
+   /* Nonzero means value is a pc-relative offset
+      and it should be relocated for changes in its own address
+      as well as for changes in the symbol or section specified.  */
+-  unsigned int r_pcrel:1;
++  uint32_t r_pcrel:1;
+   /* Length (as exponent of 2) of the field to be relocated.
+      Thus, a value of 2 indicates 1<<2 bytes.  */
+-  unsigned int r_length:2;
++  uint32_t r_length:2;
+   /* 1 => relocate with value of symbol.
+           r_symbolnum is the index of the symbol
+ 	  in file's the symbol table.
+      0 => relocate with the address of a segment.
+           r_symbolnum is N_TEXT, N_DATA, N_BSS or N_ABS
+ 	  (the N_EXT bit may be set also, but signifies nothing).  */
+-  unsigned int r_extern:1;
++  uint32_t r_extern:1;
+   /* Four bits that aren't used, but when writing an object file
+      it is desirable to clear them.  */
+-  unsigned int r_pad:4;
++  uint32_t r_pad:4;
+ };
+ 
+ #endif /* __A_OUT_GNU_H__ */
+diff --git a/src/emx/include/sys/omflib.h b/src/emx/include/sys/omflib.h
+index f3ef3bb..60fbbe9 100644
+--- a/src/emx/include/sys/omflib.h
++++ b/src/emx/include/sys/omflib.h
+@@ -13,7 +13,7 @@ extern "C" {
+ #define _BYTE_WORD_DWORD
+ typedef unsigned char byte;
+ typedef unsigned short word;
+-typedef unsigned long dword;
++typedef unsigned int dword;     /* komh: was unsigned long */
+ #endif /* _BYTE_WORD_DWORD */
+ 
+ #if !defined (THEADR)
+diff --git a/src/emx/src/emxbind/cmd.c b/src/emx/src/emxbind/cmd.c
+index 08100df..25bd82d 100644
+--- a/src/emx/src/emxbind/cmd.c
++++ b/src/emx/src/emxbind/cmd.c
+@@ -55,7 +55,8 @@ static void exe_type (void)
+ 
+ static void strip_symbols (void)
+ {
+-  long size, pos, str_len;
++  long size, pos;
++  int str_len;                  /* komh: was long */
+ 
+   pos = a_in_pos + a_in_sym;
+   size = my_size (&inp_file);
+diff --git a/src/emx/src/emxbind/emxbind.h b/src/emx/src/emxbind/emxbind.h
+index e84444a..01b6449 100644
+--- a/src/emx/src/emxbind/emxbind.h
++++ b/src/emx/src/emxbind/emxbind.h
+@@ -286,7 +286,7 @@ EXTERN long a_in_pos;
+ 
+ /* The size of the string table in the source a.out (sub)file. */
+ 
+-EXTERN long a_in_str_size;
++EXTERN int a_in_str_size;       /* komh: was long */
+ 
+ /* The offsets of the data section and symbol table, respectively, of
+    the source a.out (sub)file. */
+@@ -338,7 +338,7 @@ EXTERN struct relocation_info *dr_image INIT (NULL);
+ /* This array contains the symbol table, as read from the source a.out
+    file. */
+ 
+-EXTERN struct nlist *sym_image INIT (NULL);
++EXTERN struct ninfo *sym_image INIT (NULL);
+ 
+ /* This array contains the string table, as read from the source a.out
+    file. */
+@@ -482,7 +482,7 @@ void copy (struct file *src, long size);
+ /* fixup.c */
+ 
+ void build_sym_hash_table (void);
+-struct nlist *find_symbol (const char *name);
++struct ninfo *find_symbol (const char *name);
+ void sort_fixup (void);
+ void create_fixup (const struct fixup *fp, int neg);
+ void relocations (void);
+diff --git a/src/emx/src/emxbind/exec.c b/src/emx/src/emxbind/exec.c
+index 31e4a5d..28066ab 100644
+--- a/src/emx/src/emxbind/exec.c
++++ b/src/emx/src/emxbind/exec.c
+@@ -308,7 +308,7 @@ void read_sym (void)
+       my_read (sym_image, a_in_h.a_syms, &inp_file);
+       my_seek (&inp_file, a_in_str);
+       my_read (str_image, a_in_str_size, &inp_file);
+-      sym_count = a_in_h.a_syms / sizeof (struct nlist);
++      sym_count = a_in_h.a_syms / sizeof (struct ninfo);
+       build_sym_hash_table ();
+     }
+ }
+diff --git a/src/emx/src/emxbind/export.c b/src/emx/src/emxbind/export.c
+index d48f6e6..0eaf337 100644
+--- a/src/emx/src/emxbind/export.c
++++ b/src/emx/src/emxbind/export.c
+@@ -137,7 +137,7 @@ void exports (void)
+ {
+   int i, j, n, ord, bundle;
+   struct export *exp;
+-  struct nlist *nl;
++  struct ninfo *nl;
+   int *used;
+   byte count;
+   byte flags;
+diff --git a/src/emx/src/emxbind/fixup.c b/src/emx/src/emxbind/fixup.c
+index eb6684c..2958508 100644
+--- a/src/emx/src/emxbind/fixup.c
++++ b/src/emx/src/emxbind/fixup.c
+@@ -102,7 +102,7 @@ void build_sym_hash_table (void)
+    If the symbol is found, find_symbol() returns a pointer to the symbol
+    table entry.  Otherwise, NULL is returned. */
+ 
+-struct nlist *find_symbol (const char *name)
++struct ninfo *find_symbol (const char *name)
+ {
+   int j, len;
+   const char *name1 = name;
+diff --git a/src/emx/src/emxbind/map.c b/src/emx/src/emxbind/map.c
+index bad7807..b218492 100644
+--- a/src/emx/src/emxbind/map.c
++++ b/src/emx/src/emxbind/map.c
+@@ -132,7 +132,7 @@ static void map_publics (const char *title,
+   qsort (map_sym_table, map_sym_count, sizeof (*map_sym_table), compare);
+   for (i = 0; i < map_sym_count; ++i)
+     if (map_sym_table[i].imp_mod == NULL)
+-      fprintf (map_file, " %.4X:%.8lX       %s\n", map_sym_table[i].seg,
++      fprintf (map_file, " %.4X:%.8X       %s\n", map_sym_table[i].seg,
+                map_sym_table[i].addr, map_sym_table[i].name);
+     else if (map_sym_table[i].imp_name != NULL)
+       fprintf (map_file, " %.4X:%.8lX  Imp  %-20s (%s.%s)\n", 0, 0L,
+@@ -260,7 +260,7 @@ static void map_exports (void)
+           seg = 0; break;
+         }
+       if (seg != 0)
+-        fprintf (map_file, " %.4X:%.8lX %-23s %s\n",
++        fprintf (map_file, " %.4X:%.8X %-23s %s\n",
+                  seg, p->offset, p->entryname, p->internalname);
+     }
+ }
+diff --git a/src/emx/src/emxbind/resource.c b/src/emx/src/emxbind/resource.c
+index 4814889..7216ac2 100644
+--- a/src/emx/src/emxbind/resource.c
++++ b/src/emx/src/emxbind/resource.c
+@@ -263,7 +263,7 @@ void write_res (void)
+                         res_obj_count - res_preload_obj_count,
+                         plural_s (res_obj_count - res_preload_obj_count));
+ 	    }
+-	  printf ("  Writing:  %ld bytes in %lu page%s\n",
++	  printf ("  Writing:  %d bytes in %u page%s\n",
+                   round_4 (rop->obj_size),
+                   npages (rop->obj_size), plural_s (npages (rop->obj_size)));
+ 	}
+@@ -271,7 +271,7 @@ void write_res (void)
+       for (j = 0; j < rop->res_len; ++j)
+ 	{
+ 	  if (verbosity >= 2)
+-	    printf ("    %d.%d (%lu byte%s)\n",
++	    printf ("    %d.%d (%u byte%s)\n",
+                     rop->res[j].id, rop->res[j].type,
+                     rop->res[j].length, plural_s (rop->res[j].length));
+ 	  fill (rop->res[j].offset - pos);
+diff --git a/src/emx/src/emxexp/emxexp.c b/src/emx/src/emxexp/emxexp.c
+index d4b5353..aa87bc0 100644
+--- a/src/emx/src/emxexp/emxexp.c
++++ b/src/emx/src/emxexp/emxexp.c
+@@ -351,7 +351,7 @@ static void new_print(FILE *phfile, struct new_symgrp *psymgrp)
+             cch += fprintf (phfile, " NONAME");
+ 
+           /* comments - the first one might be used by emximp later... */
+-          fprintf (phfile, "  ; magicseg='%s' len=%d",
++          fprintf (phfile, "  ; magicseg='%s' len=%zu",
+                    psymgrp->name ? psymgrp->name : "", strlen(psym->name));
+           if (psym->fweak)
+               fprintf (phfile, "  weak");
+@@ -428,9 +428,9 @@ static void process_aout (FILE *inp_file, long size)
+   byte *inp_buf;
+   const struct exec *a_out_h;
+   const byte *sym;
+-  const struct nlist *sym_ptr;
++  const struct ninfo *sym_ptr;
+   const byte *str_ptr;
+-  long str_size;
++  int str_size;                 /* komh: was long */
+   int sym_count, i;
+   const char *name;
+ 
+@@ -449,9 +449,9 @@ static void process_aout (FILE *inp_file, long size)
+   str_ptr = sym + a_out_h->a_syms;
+   if (str_ptr + 4 - inp_buf > size)
+     error ("Malformed input file `%s'", inp_fname);
+-  str_size = *(long *)str_ptr;
+-  sym_ptr = (const struct nlist *)sym;
+-  sym_count = a_out_h->a_syms / sizeof (struct nlist);
++  str_size = *(int *)str_ptr;
++  sym_ptr = (const struct ninfo *)sym;
++  sym_count = a_out_h->a_syms / sizeof (struct ninfo);
+   if (str_ptr + str_size - inp_buf > size)
+     error ("Malformed input file `%s'", inp_fname);
+ 
+diff --git a/src/emx/src/emximp/emximp.c b/src/emx/src/emximp/emximp.c
+index 7bcae03..06c391c 100644
+--- a/src/emx/src/emximp/emximp.c
++++ b/src/emx/src/emximp/emximp.c
+@@ -632,7 +632,7 @@ static void finish_ar (void)
+ static dword aout_str_size;
+ static char aout_str_tab[2048];
+ static int aout_sym_count;
+-static struct nlist aout_sym_tab[6];
++static struct ninfo aout_sym_tab[6];
+ 
+ static byte aout_text[300];
+ static int aout_text_size;
+@@ -1359,13 +1359,13 @@ static void read_dll(const char *pszFilename)
+         unsigned short e_cs;
+         unsigned short e_lfarlc;
+         unsigned short e_ovno;
+-        unsigned long  e_sym_tab;
++        unsigned int   e_sym_tab;           /* komh: was unsigned long */
+         unsigned short e_flags;
+         unsigned short e_res;
+         unsigned short e_oemid;
+         unsigned short e_oeminfo;
+         unsigned short e_res2[10];
+-        unsigned long  e_lfanew;
++        unsigned int   e_lfanew;            /* komh: was unsigned long */
+     }           doshdr;
+ 
+ #define E32MAGIC    0x584c /* LX */
+@@ -1379,50 +1379,50 @@ static void read_dll(const char *pszFilename)
+         unsigned char   e32_magic[2];
+         unsigned char   e32_border;
+         unsigned char   e32_worder;
+-        unsigned long   e32_level;
++        unsigned int    e32_level;          /* komh: was unsigned long */
+         unsigned short  e32_cpu;
+         unsigned short  e32_os;
+-        unsigned long   e32_ver;
+-        unsigned long   e32_mflags;
+-        unsigned long   e32_mpages;
+-        unsigned long   e32_startobj;
+-        unsigned long   e32_eip;
+-        unsigned long   e32_stackobj;
+-        unsigned long   e32_esp;
+-        unsigned long   e32_pagesize;
+-        unsigned long   e32_pageshift;
+-        unsigned long   e32_fixupsize;
+-        unsigned long   e32_fixupsum;
+-        unsigned long   e32_ldrsize;
+-        unsigned long   e32_ldrsum;
+-        unsigned long   e32_objtab;
+-        unsigned long   e32_objcnt;
+-        unsigned long   e32_objmap;
+-        unsigned long   e32_itermap;
+-        unsigned long   e32_rsrctab;
+-        unsigned long   e32_rsrccnt;
+-        unsigned long   e32_restab;
+-        unsigned long   e32_enttab;
+-        unsigned long   e32_dirtab;
+-        unsigned long   e32_dircnt;
+-        unsigned long   e32_fpagetab;
+-        unsigned long   e32_frectab;
+-        unsigned long   e32_impmod;
+-        unsigned long   e32_impmodcnt;
+-        unsigned long   e32_impproc;
+-        unsigned long   e32_pagesum;
+-        unsigned long   e32_datapage;
+-        unsigned long   e32_preload;
+-        unsigned long   e32_nrestab;
+-        unsigned long   e32_cbnrestab;
+-        unsigned long   e32_nressum;
+-        unsigned long   e32_autodata;
+-        unsigned long   e32_debuginfo;
+-        unsigned long   e32_debuglen;
+-        unsigned long   e32_instpreload;
+-        unsigned long   e32_instdemand;
+-        unsigned long   e32_heapsize;
+-        unsigned long   e32_stacksize;
++        unsigned int    e32_ver;            /* komh: was unsigned long */
++        unsigned int    e32_mflags;         /* komh: was unsigned long */
++        unsigned int    e32_mpages;         /* komh: was unsigned long */
++        unsigned int    e32_startobj;       /* komh: was unsigned long */
++        unsigned int    e32_eip;            /* komh: was unsigned long */
++        unsigned int    e32_stackobj;       /* komh: was unsigned long */
++        unsigned int    e32_esp;            /* komh: was unsigned long */
++        unsigned int    e32_pagesize;       /* komh: was unsigned long */
++        unsigned int    e32_pageshift;      /* komh: was unsigned long */
++        unsigned int    e32_fixupsize;      /* komh: was unsigned long */
++        unsigned int    e32_fixupsum;       /* komh: was unsigned long */
++        unsigned int    e32_ldrsize;        /* komh: was unsigned long */
++        unsigned int    e32_ldrsum;         /* komh: was unsigned long */
++        unsigned int    e32_objtab;         /* komh: was unsigned long */
++        unsigned int    e32_objcnt;         /* komh: was unsigned long */
++        unsigned int    e32_objmap;         /* komh: was unsigned long */
++        unsigned int    e32_itermap;        /* komh: was unsigned long */
++        unsigned int    e32_rsrctab;        /* komh: was unsigned long */
++        unsigned int    e32_rsrccnt;        /* komh: was unsigned long */
++        unsigned int    e32_restab;         /* komh: was unsigned long */
++        unsigned int    e32_enttab;         /* komh: was unsigned long */
++        unsigned int    e32_dirtab;         /* komh: was unsigned long */
++        unsigned int    e32_dircnt;         /* komh: was unsigned long */
++        unsigned int    e32_fpagetab;       /* komh: was unsigned long */
++        unsigned int    e32_frectab;        /* komh: was unsigned long */
++        unsigned int    e32_impmod;         /* komh: was unsigned long */
++        unsigned int    e32_impmodcnt;      /* komh: was unsigned long */
++        unsigned int    e32_impproc;        /* komh: was unsigned long */
++        unsigned int    e32_pagesum;        /* komh: was unsigned long */
++        unsigned int    e32_datapage;       /* komh: was unsigned long */
++        unsigned int    e32_preload;        /* komh: was unsigned long */
++        unsigned int    e32_nrestab;        /* komh: was unsigned long */
++        unsigned int    e32_cbnrestab;      /* komh: was unsigned long */
++        unsigned int    e32_nressum;        /* komh: was unsigned long */
++        unsigned int    e32_autodata;       /* komh: was unsigned long */
++        unsigned int    e32_debuginfo;      /* komh: was unsigned long */
++        unsigned int    e32_debuglen;       /* komh: was unsigned long */
++        unsigned int    e32_instpreload;    /* komh: was unsigned long */
++        unsigned int    e32_instdemand;     /* komh: was unsigned long */
++        unsigned int    e32_heapsize;       /* komh: was unsigned long */
++        unsigned int    e32_stacksize;      /* komh: was unsigned long */
+         unsigned char   e32_res3[20];
+     }           os2hdr;
+ #pragma pack()
+diff --git a/src/emx/src/emxomf/emxomf.c b/src/emx/src/emxomf/emxomf.c
+index 977ddbc..871852d 100644
+--- a/src/emx/src/emxomf/emxomf.c
++++ b/src/emx/src/emxomf/emxomf.c
+@@ -149,7 +149,7 @@ int sym_count = 0;
+ /* The sym_ptr variable points to an array of a.out symbols.  There
+    are sym_count table entries.  Note that this table is complemented
+    by the sym_more table. */
+-const struct nlist *sym_ptr = NULL;
++const struct ninfo *sym_ptr = NULL;
+ 
+ /* The str_ptr variable points to the a.out string table.  The
+    elements of sym_ptr contain offsets into this table.  The table
+@@ -350,7 +350,7 @@ static struct symbol *sym_more;
+ 
+ /* The length of the a.out string table, in bytes.  This value
+    includes the 32-bit number at the start of the string table. */
+-static long str_size;
++static int32_t str_size;
+ 
+ /* omflib_write_module() stored the page number of the module to this
+    variable. */
+@@ -548,7 +548,7 @@ static inline int strip_underscore (const char *name)
+    NOT_ENTRY is an entry index which is not to be found.
+    FEXT is an indicator on whether or not we can find external symbols or
+    not.  */
+-const struct nlist *find_symbol_ex (const char *name, int not_entry, int fext)
++const struct ninfo *find_symbol_ex (const char *name, int not_entry, int fext)
+ {
+   int i, j, n, len, t;
+ 
+@@ -585,7 +585,7 @@ const struct nlist *find_symbol_ex (const char *name, int not_entry, int fext)
+    NAME.  On success, a pointer to the symbol table entry (in the
+    array pointed to by sym_ptr) is returned.  If the symbol is not
+    found, NULL is returned. */
+-const struct nlist *find_symbol (const char *name)
++const struct ninfo *find_symbol (const char *name)
+ {
+   return find_symbol_ex (name, -1, 0);
+ }
+@@ -846,7 +846,7 @@ static int make_nstr (const char *pszName, size_t cch, char *pszOutBuf)
+         pszOutBuf[SYMBOL_MAX_LENGTH + SYMBOL_HASH_LENGTH] = '\0';
+ 
+         if (warning_level > 1)
+-            warning ("Truncated symbol '%.*s' to '%.*s%s'", cch, pszName, SYMBOL_MAX_LENGTH, pszName, szHash);
++            warning ("Truncated symbol '%.*s' to '%.*s%s'", (int) cch, pszName, SYMBOL_MAX_LENGTH, pszName, szHash);
+ 
+         cch = SYMBOL_MAX_LENGTH + SYMBOL_HASH_LENGTH;
+     }
+@@ -1150,7 +1150,7 @@ static void write_wkext (void)
+  *                      This must be at least 256, the code make this assumption!
+  * @remark I'm sorry this function is written in my coding style - not!
+  */
+-static const char *weak_process_name(const struct nlist *pSym, const char *pszOrgName, char *pachName, int cchName)
++static const char *weak_process_name(const struct ninfo *pSym, const char *pszOrgName, char *pachName, int cchName)
+ {
+     switch (pSym->n_type)
+     {
+@@ -1673,7 +1673,7 @@ static void write_seg (int index, int seg_name, byte *src, long seg_size,
+             /* The relocation refers to a symbol.  Look into the
+                symbol table to find the fixup type and target
+                address. */
+-            const struct nlist *sym = &sym_ptr[r->r_symbolnum];
++            const struct ninfo *sym = &sym_ptr[r->r_symbolnum];
+ /*#ifdef DEBUG
+             const char *psz = sym->n_un.n_strx + str_ptr;
+ #endif*/
+@@ -2309,7 +2309,7 @@ static int fetch_modstr (const struct relocation_info *rel, dword addr,
+       struct modstr *p;
+       byte *buf;
+       const char *sym_name;
+-      const struct nlist *m_sym = NULL;
++      const struct ninfo *m_sym = NULL;
+       const struct exec *m_ao = NULL;
+ 
+       /* We have to take the string from another module.  First try to
+@@ -2355,12 +2355,12 @@ static int fetch_modstr (const struct relocation_info *rel, dword addr,
+               t = buf + sizeof (struct exec);
+               t += m_ao->a_text; t += m_ao->a_data;
+               t += m_ao->a_trsize; t += m_ao->a_drsize;
+-              m_sym = (const struct nlist *)t; t += m_ao->a_syms;
++              m_sym = (const struct ninfo *)t; t += m_ao->a_syms;
+               m_str = t;
+               if (m_str + 4 - buf > size)
+                 break;
+               m_str_size = *(long *)m_str;
+-              m_sym_count = m_ao->a_syms / sizeof (struct nlist);
++              m_sym_count = m_ao->a_syms / sizeof (struct ninfo);
+               if (m_str + m_str_size - buf > size)
+                 break;
+               for (i = 0; i < m_sym_count; ++i)
+@@ -2743,7 +2743,7 @@ static int handle_import_i1 (void)
+ static void make_export(const char *pszSymbol, size_t cchSymbol,
+                         const char *pszExpName, size_t cchExpName, unsigned iOrdinal)
+ {
+-    const struct nlist *pSym;
++    const struct ninfo *pSym;
+     char *pszSym = alloca(cchSymbol + 1);
+     memcpy(pszSym, pszSymbol, cchSymbol);
+     pszSym[cchSymbol] = '\0';
+@@ -3471,7 +3471,7 @@ static void list_unknown_stabs (void)
+ static void o_to_omf (long size)
+ {
+   byte *t;
+-  const struct nlist *entry_symbol;
++  const struct ninfo *entry_symbol;
+   struct set *set_ptr;
+   int j;
+ 
+@@ -3496,7 +3496,7 @@ static void o_to_omf (long size)
+   data_ptr = t; t += data_size;
+   text_rel = (const struct relocation_info *)t; t += a_out_h->a_trsize;
+   data_rel = (const struct relocation_info *)t; t += a_out_h->a_drsize;
+-  sym_ptr = (const struct nlist *)t; t += a_out_h->a_syms;
++  sym_ptr = (const struct ninfo *)t; t += a_out_h->a_syms;
+   str_ptr = t;
+   if (a_out_h->a_syms == 0)
+     str_size = 0;
+@@ -3504,9 +3504,9 @@ static void o_to_omf (long size)
+     {
+       if (str_ptr + 4 - inp_buf > size)
+         goto invalid;
+-      str_size = *(long *)str_ptr;
++      str_size = *(int32_t *)str_ptr;
+     }
+-  sym_count = a_out_h->a_syms / sizeof (struct nlist);
++  sym_count = a_out_h->a_syms / sizeof (struct ninfo);
+   if (str_ptr + str_size - inp_buf > size)
+     goto invalid;
+ 
+diff --git a/src/emx/src/emxomf/emxomf.h b/src/emx/src/emxomf/emxomf.h
+index 052b641..8316847 100644
+--- a/src/emx/src/emxomf/emxomf.h
++++ b/src/emx/src/emxomf/emxomf.h
+@@ -29,14 +29,14 @@ extern void warning (const char *fmt, ...) ATTR_PRINTF (1, 2);
+ extern void *xmalloc (size_t n);
+ void *xrealloc (void *ptr, size_t n);
+ char *xstrdup (const char *s);
+-extern const struct nlist *find_symbol (const char *name);
+-extern const struct nlist *find_symbol_ex (const char *name, int not_entry, int fext);
++extern const struct ninfo *find_symbol (const char *name);
++extern const struct ninfo *find_symbol_ex (const char *name, int not_entry, int fext);
+ extern void set_hll_type (int index, int hll_type);
+ 
+ /* These variables are defined in emxomf.c. */
+ 
+ extern int sym_count;
+-extern const struct nlist *sym_ptr;
++extern const struct ninfo *sym_ptr;
+ extern const byte *str_ptr;
+ extern byte *text_ptr;
+ extern long text_size;
+diff --git a/src/emx/src/emxomf/emxomfld.c b/src/emx/src/emxomf/emxomfld.c
+index 7cbd0d2..d60f557 100644
+--- a/src/emx/src/emxomf/emxomfld.c
++++ b/src/emx/src/emxomf/emxomfld.c
+@@ -646,7 +646,7 @@ static int check_omf(FILE *phFile)
+  */
+ static int check_lx_dll(FILE *phFile)
+ {
+-    unsigned long   ul;
++    unsigned int    ul;             /* komh: was unsigned long */
+     char            achMagic[2];
+ 
+     if (    fseek(phFile, 0, SEEK_SET)
+@@ -1361,7 +1361,7 @@ static void gen_deffile(void)
+                     "DATA MULTIPLE\n"
+                     "CODE SHARED\n"
+                     "\n",
+-                    cchName, pszName);
++                    (int)cchName, pszName);
+             fclose(pFile);
+             def_fname = psz;
+             if (opt_t)
+@@ -1372,7 +1372,7 @@ static void gen_deffile(void)
+                         "DATA MULTIPLE NONSHARED\n"
+                         "CODE SINGLE SHARED\n"
+                         "---- End of generated def-file.\n",
+-                        psz, cchName, pszName);
++                        psz, (int)cchName, pszName);
+ 
+             /* add to auto delete list for removal on exit(). */
+             pName->next = conv_list;
+diff --git a/src/emx/src/emxomf/grow.c b/src/emx/src/emxomf/grow.c
+index 0b990ce..828e2a1 100644
+--- a/src/emx/src/emxomf/grow.c
++++ b/src/emx/src/emxomf/grow.c
+@@ -393,6 +393,6 @@ int strpool_len (const char *s)
+     assert(((uintptr_t)s & (sizeof(int) - 1)) == 0);
+     if (!s)
+       return 0;
+-    return ((size_t *)s)[-1];
++    return ((int *)s)[-1];
+ }
+ 
+diff --git a/src/emx/src/emxomf/listomf.c b/src/emx/src/emxomf/listomf.c
+index fb81066..315ce3e 100644
+--- a/src/emx/src/emxomf/listomf.c
++++ b/src/emx/src/emxomf/listomf.c
+@@ -405,7 +405,7 @@ static void dump_block (int count, int indent, int foff)
+       if (x == 0)
+         {
+           if (foff)
+-            printf ("%*s%08lx %03x:", indent, "",
++            printf ("%*s%08zu %03zu:", indent, "",
+                     rec_pos + rec_idx - 1 + sizeof (struct omf_rec),
+                     rec_idx - 1 + sizeof (struct omf_rec));
+           else
+@@ -455,7 +455,7 @@ static void list_libhdr (void)
+   page_size = rec_len + 1 + 3;
+   printf ("  Page size: %u\n", page_size);
+   dict_offset = get_dword ();
+-  printf ("  Dictionary offset: 0x%lx\n", dict_offset);
++  printf ("  Dictionary offset: 0x%x\n", dict_offset);
+   dict_blocks = get_word ();
+   printf ("  Dictionary blocks: %u\n", dict_blocks);
+   flags = get_byte ();
+@@ -743,7 +743,7 @@ static void list_segdef (void)
+     }
+   if (attributes & 1)
+     printf (" USE32");
+-  printf (" Length: %#lx", length);
++  printf (" Length: %#x", length);
+   printf (" CLASS ");
+   show_name (class);
+   printf ("\n");
+@@ -824,7 +824,7 @@ static void list_pubdef (void)
+       show_string (name);
+       offset = get_word_or_dword ();
+       type = get_index ();
+-      printf (", offset: %#lx, type: %d\n", offset, type);
++      printf (", offset: %#x, type: %d\n", offset, type);
+       ++pub_count;
+     }
+ }
+@@ -851,11 +851,11 @@ static void list_comdef (void)
+         case 0x61:
+           comm_count = get_commlen ();
+           comm_len = get_commlen ();
+-          printf ("FAR, %lu times %lu bytes\n", comm_count, comm_len);
++          printf ("FAR, %u times %u bytes\n", comm_count, comm_len);
+           break;
+         case 0x62:
+           comm_len = get_commlen ();
+-          printf ("NEAR, %lu bytes\n", comm_len);
++          printf ("NEAR, %u bytes\n", comm_len);
+           break;
+         default:
+           printf ("unknown data type: %#x\n", data_type);
+@@ -922,7 +922,7 @@ static void list_symbols (void)
+           if (rec_idx < rec_len)
+             {
+               length = get_dword ();
+-              printf ("offset: %#lx [@%#x], length: %#lx",
++              printf ("offset: %#x [@%#x], length: %#x",
+                       offset, location, length);
+               if (rec_idx < rec_len)
+                 {
+@@ -932,7 +932,7 @@ static void list_symbols (void)
+                 }
+             }
+           else
+-            printf ("offset: %#lx [@%#x], no length",
++            printf ("offset: %#x [@%#x], no length",
+                     offset, location);
+           break;
+         case 0x01:
+@@ -971,9 +971,9 @@ static void list_symbols (void)
+               get_string (name);
+               show_string (name);
+             }
+-          printf (", offset: %#lx [@%#x], type: #%lu\n",
++          printf (", offset: %#x [@%#x], type: #%u\n",
+                   offset, location, type);
+-          printf ("       length: %#lx, pro: %#lx, pro+body: %#lx, ",
++          printf ("       length: %#x, pro: %#x, pro+body: %#x, ",
+                   length, prologue, body);
+           switch (near_far)
+             {
+@@ -990,11 +990,11 @@ static void list_symbols (void)
+               printf ("32-bit far");
+               break;
+             default:
+-              printf ("nf: %#lx", near_far);
++              printf ("nf: %#x", near_far);
+               break;
+             }
+           if (sst == 0x1a)      /* Member function */
+-            printf ("\n       class type: #%lu", class_type);
++            printf ("\n       class type: #%u", class_type);
+           break;
+         case 0x02:
+           printf ("End");
+@@ -1005,7 +1005,7 @@ static void list_symbols (void)
+           type = get_word ();
+           get_string (name);
+           show_string (name);
+-          printf (", offset: %#lx, type: #%lu", offset, type);
++          printf (", offset: %#x, type: #%u", offset, type);
+           break;
+         case 0x05:
+         case 0x1e:
+@@ -1024,7 +1024,7 @@ static void list_symbols (void)
+               get_string (name);
+               show_string (name);
+             }
+-          printf (", offset: %#lx [@%#x], seg: %u [@%#x], type: #%lu",
++          printf (", offset: %#x [@%#x], seg: %u [@%#x], type: #%u",
+                   offset, location, seg, location + 4, type);
+           break;
+         case 0x0b:
+@@ -1033,7 +1033,7 @@ static void list_symbols (void)
+           offset = get_dword ();
+           near_far = get_byte ();
+           get_string (name);
+-          printf ("offset: %#lx [@%#x]", offset, location);
++          printf ("offset: %#x [@%#x]", offset, location);
+           show_string (name);
+           break;
+         case 0x0c:
+@@ -1161,10 +1161,10 @@ static void list_symbols (void)
+             case 0x85:
+             case 0x86:
+             case 0x87:
+-              printf ("ST(%lu)", reg - 0x80);
++              printf ("ST(%u)", reg - 0x80);
+               break;
+             default:
+-              printf ("unknown register: %#.2lx", reg);
++              printf ("unknown register: %#.2x", reg);
+             }
+           break;
+         case 0x0e:
+@@ -1179,7 +1179,7 @@ static void list_symbols (void)
+           seg = get_word ();
+           reserved = get_word ();
+           printf ("segment: %u [@%#x]", seg, location);
+-          printf (", reserved: %#lx", reserved);
++          printf (", reserved: %#x", reserved);
+           break;
+         case 0x12:
+           printf ("Typedef");
+@@ -1190,7 +1190,7 @@ static void list_symbols (void)
+         case 0x14:
+           printf ("Member ");
+           offset = get_dword ();
+-          printf ("offset: %#lx, name: ", offset);
++          printf ("offset: %#x, name: ", offset);
+           get_string (name);
+           show_string (name);
+           break;
+@@ -1198,14 +1198,14 @@ static void list_symbols (void)
+           printf ("Based ");
+           offset = get_dword ();
+           type = get_word ();
+-          printf ("offset: %#lx, type: #%lu, name: ", offset, type);
++          printf ("offset: %#x, type: #%u, name: ", offset, type);
+           get_string (name);
+           show_string (name);
+           break;
+         case 0x16:
+           printf ("Tag ");
+           type = get_word ();
+-          printf ("type: #%lu, name: ", type);
++          printf ("type: #%u, name: ", type);
+           get_string (name);
+           show_string (name);
+           break;
+@@ -1223,7 +1223,7 @@ static void list_symbols (void)
+         case 0x19:
+           printf ("Class ");
+           type = get_word ();
+-          printf ("type: #%lu, name: ", type);
++          printf ("type: #%u, name: ", type);
+           show_enc ();
+           break;
+         case 0x1b:
+@@ -1233,7 +1233,7 @@ static void list_symbols (void)
+           line = get_dword ();
+           type = get_word ();
+           get_string (name);
+-          printf ("offset: %#lx, source file: %u, line: %lu, type: #%lu\n",
++          printf ("offset: %#x, source file: %u, line: %u, type: #%u\n",
+                   offset, file, line, type);
+           printf ("    name: ");
+           show_string (name);
+@@ -1246,8 +1246,8 @@ static void list_symbols (void)
+           line = get_dword ();
+           type = get_word ();
+           get_string (name);
+-          printf ("offset: %#lx, segment: %u, source file: %u, "
+-                  "line: %lu, type: %lu\n",
++          printf ("offset: %#x, segment: %u, source file: %u, "
++                  "line: %u, type: %u\n",
+                   offset, seg, file, line, type);
+           printf ("    name: ");
+           show_string (name);
+@@ -1270,7 +1270,7 @@ static void list_symbols (void)
+               printf ("PL/I");
+               break;
+             default:
+-              printf ("unknown compiler id: %#lx", compiler_id);
++              printf ("unknown compiler id: %#x", compiler_id);
+               break;
+             }
+           printf (", options: ");
+@@ -1399,7 +1399,7 @@ static void show_fid (void)
+       break;
+     case 0x86:
+       d = get_dword ();
+-      printf ("%lu", d);
++      printf ("%u", d);
+       break;
+     case 0x88:
+       i = get_byte ();
+@@ -1415,7 +1415,7 @@ static void show_fid (void)
+       break;
+     case 0x8a:
+       d = get_dword ();
+-      printf ("%ld", d);
++      printf ("%d", d);
+       break;
+     case 0x8b:
+       i = get_byte ();
+@@ -1479,7 +1479,7 @@ static void list_types (void)
+             printf ("(qual: %#x) ", qual);
+           size = get_dword ();
+           fields = get_word ();
+-          printf ("size: %#lx, %d items: ", size, fields);
++          printf ("size: %#x, %d items: ", size, fields);
+           printf ("#%u, name: ", get_word());
+           show_enc ();
+           printf ("\n");
+@@ -1654,7 +1654,7 @@ static void list_types (void)
+           if (qual & ~0x03)
+             printf ("qual: %#x, ", qual);
+           size = get_dword ();
+-          printf ("size: %#lx, name: ", size);
++          printf ("size: %#x, name: ", size);
+           show_fid ();
+           printf ("\n");
+           dump_rest ();
+@@ -1737,7 +1737,7 @@ static void list_types (void)
+           if (qual & ~7)
+             printf ("(qual: %#x) ", qual);
+           size = get_dword ();
+-          printf ("size: %#lx, bounds type: ", size);
++          printf ("size: %#x, bounds type: ", size);
+           show_fid ();
+           printf (", elements type: ");
+           show_fid ();
+@@ -1753,7 +1753,7 @@ static void list_types (void)
+             printf ("(qual: %#x) ", qual);
+           size = get_dword ();
+           fields = get_word ();
+-          printf ("size: %#lx, %d fields: ", size, fields);
++          printf ("size: %#x, %d fields: ", size, fields);
+           show_fid ();
+           printf (", names: ");
+           show_fid ();
+@@ -1876,7 +1876,7 @@ static void list_ledata (void)
+ 
+   printf (" ");
+   show_seg (seg);
+-  printf (" offset: %#lx length: %#x\n", offset, len);
++  printf (" offset: %#x length: %#x\n", offset, len);
+   name = lname_list[segment_list[seg-1].name-1];
+   if (strcmp (name, "$$SYMBOLS") == 0 && list_debug
+       && debug_info == debug_hll && hll_style >= 3)
+@@ -1900,13 +1900,13 @@ static void list_block (int level)
+   if (block_count == 0)
+     {
+       len = get_byte ();
+-      printf ("%*sRepeat count: %lu, data length: %d\n",
++      printf ("%*sRepeat count: %u, data length: %d\n",
+               indent, "", rep_count, len);
+       dump_block (len, indent + 2, 0);
+     }
+   else
+     {
+-      printf ("%*sRepeat count: %lu, block count: %lu\n",
++      printf ("%*sRepeat count: %u, block count: %u\n",
+               indent, "", rep_count, block_count);
+       while (block_count > 0)
+         {
+@@ -1928,7 +1928,7 @@ static void list_lidata (void)
+ 
+   printf (" ");
+   show_seg (seg);
+-  printf (" offset: %#lx length: %#x\n", offset, rec_len - rec_idx);
++  printf (" offset: %#x length: %#x\n", offset, rec_len - rec_idx);
+   while (rec_len - rec_idx >= 4)
+     list_block (0);
+   dump_rest ();
+@@ -2062,7 +2062,7 @@ static void list_fixupp (void)
+               list_target (fix_data & 3);
+             }
+           if (!(fix_data & 0x04))
+-            printf (", disp: %#lx", get_word_or_dword ());
++            printf (", disp: %#x", get_word_or_dword ());
+         }
+       else
+         {
+@@ -2098,7 +2098,7 @@ static void list_hll_linnum (void)
+       printf (", ");
+       line = get_word ();
+       if (line != 0)
+-        printf ("must_be_zero: %ld, ", line);
++        printf ("must_be_zero: %d, ", line);
+       linnum_entry_type = get_byte ();
+       switch (linnum_entry_type)
+         {
+@@ -2126,7 +2126,7 @@ static void list_hll_linnum (void)
+       line_count = get_word ();
+       segment = get_word ();
+       names_length = get_dword ();
+-      printf ("%d line%s, segment: %u, name table length: %#lx",
++      printf ("%d line%s, segment: %u, name table length: %#x",
+               line_count, (line_count == 1 ? "" : "s"), segment, names_length);
+       linnum_started = TRUE;
+       linnum_files = linnum_file_idx = 0;
+@@ -2148,13 +2148,13 @@ static void list_hll_linnum (void)
+               src_line = get_word ();
+               index = get_word ();
+               addr = get_dword ();
+-              printf ("  Line %6u of file %u at 0x%.8lx", src_line, index, addr);
++              printf ("  Line %6u of file %u at 0x%.8x", src_line, index, addr);
+               break;
+             case 0x01:
+               lst_line = get_dword ();
+               stmt = get_dword ();
+               addr = get_dword ();
+-              printf ("  Line %6lu, statement %6lu at 0x%.8lx",
++              printf ("  Line %6u, statement %6u at 0x%.8x",
+                       lst_line, stmt, addr);
+               break;
+             case 0x02:
+@@ -2164,7 +2164,7 @@ static void list_hll_linnum (void)
+               stmt = get_dword ();
+               addr = get_dword ();
+               printf ("  Line %6u of file %u, ", src_line, index);
+-              printf ("listing line %6lu, statement %6lu at 0x%.8lx",
++              printf ("listing line %6u, statement %6u at 0x%.8x",
+                       lst_line, stmt, addr);
+               break;
+             case 0x03:
+@@ -2193,7 +2193,7 @@ static void list_hll_linnum (void)
+           first_col = get_dword ();
+           num_cols = get_dword ();
+           linnum_files = get_dword ();
+-          printf ("  first column: %lu, columns: %lu, number of files: %d\n",
++          printf ("  first column: %u, columns: %u, number of files: %d\n",
+                   first_col, num_cols, linnum_files);
+           linnum_file_idx = 0;
+         }
+@@ -2240,7 +2240,7 @@ static void list_modend (FILE *f)
+           list_target (end_data & 3);
+         }
+       if (!(end_data & 0x04))   /* This bit must always be clear! */
+-        printf (", disp: %#lx", get_word_or_dword ());
++        printf (", disp: %#x", get_word_or_dword ());
+     }
+   printf ("\n");
+   dump_rest ();
+diff --git a/src/emx/src/emxomf/stabshll.c b/src/emx/src/emxomf/stabshll.c
+index 5bfdc38..d5bd69d 100644
+--- a/src/emx/src/emxomf/stabshll.c
++++ b/src/emx/src/emxomf/stabshll.c
+@@ -422,11 +422,11 @@ static void warning_parse (const char *pszFormat, ...)
+       if (parse_ptr && parse_start && parse_ptr >= parse_start)
+         {
+           if (parse_pindex && *parse_pindex >= 0 && *parse_pindex < sym_count)
+-            fprintf (stderr, "emxomf info: parsing sym no.%d type=%d at char '%c' in position %d:\n%s\n",
++            fprintf (stderr, "emxomf info: parsing sym no.%d type=%d at char '%c' in position %td:\n%s\n",
+                      *parse_pindex, sym_ptr[*parse_pindex].n_type,
+                      *parse_ptr, parse_ptr - parse_start, parse_start);
+           else
+-            fprintf (stderr, "emxomf info: parsing '%c' at position %d:\n%s\n",
++            fprintf (stderr, "emxomf info: parsing '%c' at position %td:\n%s\n",
+                      *parse_ptr, parse_ptr - parse_start, parse_start);
+         }
+     }
+@@ -602,7 +602,7 @@ static void sst_end (void)
+    function also creates appropriate relocation table entries. */
+ 
+ static void sst_static (const char *name, dword addr, int type_index,
+-                        int sym_seg, int ext, const struct nlist *psym)
++                        int sym_seg, int ext, const struct ninfo *psym)
+ {
+   struct relocation_info r;
+   size_t len = strlen (name);
+@@ -653,27 +653,27 @@ static void sst_static (const char *name, dword addr, int type_index,
+  */
+ static inline unsigned type_hash (struct type *t)
+ {
+-  register unsigned uhash = 0;
++  register uintptr_t uhash = 0;
+   switch (t->tag)
+     {
+-      case ty_alias:        uhash = (unsigned)t->d.alias; break;
+-      case ty_stabs_ref:    uhash = (unsigned)t->d.stabs_ref; break;
+-      case ty_prim:         uhash = (unsigned)t->index; break;
+-      case ty_pointer:      uhash = (unsigned)t->d.pointer; break;
+-      case ty_ref:          uhash = (unsigned)t->d.ref; break;
+-      case ty_struc:        uhash = (unsigned)t->d.struc.name; break;
+-      case ty_class:        uhash = (unsigned)t->d.class.name; break;
+-      case ty_enu:          uhash = (unsigned)t->d.enu.name; break;
+-      case ty_array:        uhash = (unsigned)t->d.array.etype; break;
+-      case ty_bits:         uhash = (unsigned)t->d.bits.type; break;
+-      case ty_func:         uhash = (unsigned)t->d.func.args ^ (unsigned)t->d.func.arg_count ^ (unsigned)t->d.func.ret ^ (unsigned)t->d.func.domain; break;
+-      case ty_types:        uhash = (unsigned)t->d.types.count  << 3; break;
+-      case ty_args:         uhash = (unsigned)t->d.args.count   << 3; break;
+-      case ty_fields:       uhash = (unsigned)t->d.fields.count << 3; break;
+-      case ty_member:       uhash = (unsigned)t->d.member.type ^ (unsigned)t->d.member.name >> 7; break;
+-      case ty_values:       uhash = (unsigned)t->d.values.count << 3; break;
+-      case ty_memfunc:      uhash = (unsigned)t->d.memfunc.type; break;
+-      case ty_baseclass:    uhash = (unsigned)t->d.baseclass.type; break;
++      case ty_alias:        uhash = (uintptr_t)t->d.alias; break;
++      case ty_stabs_ref:    uhash = (uintptr_t)t->d.stabs_ref; break;
++      case ty_prim:         uhash = (uintptr_t)t->index; break;
++      case ty_pointer:      uhash = (uintptr_t)t->d.pointer; break;
++      case ty_ref:          uhash = (uintptr_t)t->d.ref; break;
++      case ty_struc:        uhash = (uintptr_t)t->d.struc.name; break;
++      case ty_class:        uhash = (uintptr_t)t->d.class.name; break;
++      case ty_enu:          uhash = (uintptr_t)t->d.enu.name; break;
++      case ty_array:        uhash = (uintptr_t)t->d.array.etype; break;
++      case ty_bits:         uhash = (uintptr_t)t->d.bits.type; break;
++      case ty_func:         uhash = (uintptr_t)t->d.func.args ^ (uintptr_t)t->d.func.arg_count ^ (uintptr_t)t->d.func.ret ^ (uintptr_t)t->d.func.domain; break;
++      case ty_types:        uhash = (uintptr_t)t->d.types.count  << 3; break;
++      case ty_args:         uhash = (uintptr_t)t->d.args.count   << 3; break;
++      case ty_fields:       uhash = (uintptr_t)t->d.fields.count << 3; break;
++      case ty_member:       uhash = (uintptr_t)t->d.member.type ^ (uintptr_t)t->d.member.name >> 7; break;
++      case ty_values:       uhash = (uintptr_t)t->d.values.count << 3; break;
++      case ty_memfunc:      uhash = (uintptr_t)t->d.memfunc.type; break;
++      case ty_baseclass:    uhash = (uintptr_t)t->d.baseclass.type; break;
+       default:break; /* shut up warnings. */
+     }
+   uhash += t->tag;
+@@ -3257,7 +3257,7 @@ static void hll_end (size_t patch_ptr, int add_start, size_t length)
+ 
+ /* Return TRUE iff symbol table entry S defines a function. */
+ 
+-static int is_fun (const struct nlist *s)
++static int is_fun (const struct ninfo *s)
+ {
+   const char *p;
+ 
+@@ -3358,7 +3358,7 @@ static void block_end (int i)
+    of the function.  proc_patch_base is used for remembering the place
+    where to patch the SST entry. */
+ 
+-static void define_fun (const struct nlist *symbol)
++static void define_fun (const struct ninfo *symbol)
+ {
+   struct type t, *t1, *t2, *t3;
+   struct relocation_info r;
+@@ -3540,7 +3540,7 @@ static void parse_symbol (int *index, int where, const char *msg, int flag)
+ {
+   char *name;
+   const char *str, *p;
+-  const struct nlist *symbol;
++  const struct ninfo *symbol;
+   struct type *t1;
+   int i, n, ti, alloc_flag;
+ 
+@@ -3565,7 +3565,7 @@ static void parse_symbol (int *index, int where, const char *msg, int flag)
+         case 'G':
+           /* Static storage, global scope */
+           {
+-          const struct nlist *sym2 = NULL;
++          const struct ninfo *sym2 = NULL;
+           ++parse_ptr;
+           ti = hll_type ();
+ #if defined (HLL_DEBUG)
+@@ -3738,7 +3738,7 @@ static void parse_symbol (int *index, int where, const char *msg, int flag)
+               break;
+             default:
+               if (warning_level > 1)
+-                  warning ("Unknown register %lu", symbol->n_value);
++                  warning ("Unknown register %u", symbol->n_value);
+               return;
+             }
+           sst_start (SST_reg);      /* Register variable */
+diff --git a/src/emx/src/emxomf/weakld.c b/src/emx/src/emxomf/weakld.c
+index 7d69844..da316f9 100644
+--- a/src/emx/src/emxomf/weakld.c
++++ b/src/emx/src/emxomf/weakld.c
+@@ -137,7 +137,7 @@ typedef struct OMFLIBHDR
+ {
+   unsigned char     chType;
+   unsigned short    cb;
+-  unsigned long     offDict;
++  unsigned int      offDict;        /* komh: was unsigned long */
+   unsigned short    cDictBlocks;
+   unsigned char     fchFlags;
+ } OMFLIBHDR, *POMFLIBHDR;
+@@ -147,7 +147,7 @@ typedef struct OMFLIBHDR
+ #pragma pack(1)
+ typedef struct OMFLIBHDRX
+ {
+-  unsigned long     offDict;
++  unsigned int      offDict;        /* komh: was unsigned long */
+   unsigned short    cDictBlocks;
+   unsigned char     fchFlags;
+ } OMFLIBHDRX, *POMFLIBHDRX;
+@@ -303,9 +303,9 @@ typedef struct wldsym
+         struct comm_data
+         {
+             /** Size of comm object */
+-            signed long         cb;
++            signed int          cb;             /* komh: was signed long */
+             /** Number of elements. */
+-            signed long         cElements;
++            signed int          cElements;      /* komh: was signed long */
+         } comm;
+     } u;
+ 
+@@ -827,8 +827,8 @@ static int          libLoadUndefSymbols(PWLD pWld, PWLDLIB pLib, PWLDSYM pSym, u
+                 signed char *       pch;
+                 unsigned short *    pus;
+                 signed short *      ps;
+-                unsigned long *     pul;
+-                signed long *       pl;
++                unsigned int *      pul;        /* komh: was unsigned long */
++                signed int *        pl;         /* komh: was signed long */
+                 void *              pv;
+             } u, u1, u2;
+ 
+@@ -2302,8 +2302,8 @@ static unsigned     pass1ReadOMFMod(PWLD pWld, PWLDMOD pMod, int fLibSearch)
+             char *              pch;
+             unsigned short *    pus;
+             short *             ps;
+-            unsigned long *     pul;
+-            long *              pl;
++            unsigned int *      pul;    /* komh: was unsigned long */
++            int *               pl;     /* komh: was long */
+             void *              pv;
+         } u, u1, u2, u3;
+ 
+diff --git a/src/emx/src/include/defs.h b/src/emx/src/include/defs.h
+index 3dd2cb1..7306c27 100644
+--- a/src/emx/src/include/defs.h
++++ b/src/emx/src/include/defs.h
+@@ -42,7 +42,7 @@ Boston, MA 02111-1307, USA.  */
+ #define _BYTE_WORD_DWORD
+ typedef unsigned char byte;
+ typedef unsigned short word;
+-typedef unsigned long dword;
++typedef unsigned int dword;     /* komh: was unsigned long */
+ #endif /* _BYTE_WORD_DWORD */
+ 
+ /* This is the header of a DOS executable file. */
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index a5d6bda..e2cec06 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -89,7 +89,7 @@ extern int _System DosCopy (char *, char *, int);
+ /* Always use the GNU version of debugging symbol type codes, if possible.  */
+ 
+ #include "stab.h"
+-#define CORE_ADDR unsigned long	/* For symseg.h */
++#define CORE_ADDR uint32_t		/* For symseg.h */
+ #include "symseg.h"
+ 
+ #include <strings.h>
+@@ -415,7 +415,7 @@ typedef
+       /* Name of this symbol.  */
+       char *name;
+       /* Value of this symbol as a global symbol.  */
+-      long value;
++      intptr_t value;
+       /* Chain of external 'nlist's in files for this symbol, both defs
+ 	 and refs.  */
+       struct nlist *refs;
+@@ -588,36 +588,36 @@ struct file_entry {
+   /* Describe the layout of the contents of the file.  */
+ 
+   /* The text section. */
+-  unsigned long int orig_text_address;
+-  unsigned long int text_size;
+-  long int text_offset;
++  uint32_t orig_text_address;
++  uint32_t text_size;
++  int32_t text_offset;
+ 
+   /* Text relocation. */
+-  unsigned long int text_reloc_size;
+-  long int text_reloc_offset;
++  uint32_t text_reloc_size;
++  int32_t text_reloc_offset;
+ 
+   /* The data section. */
+-  unsigned long int orig_data_address;
+-  unsigned long int data_size;
+-  long int data_offset;
++  uint32_t orig_data_address;
++  uint32_t data_size;
++  int32_t data_offset;
+ 
+   /* Data relocation. */
+-  unsigned long int data_reloc_size;
+-  long int data_reloc_offset;
++  uint32_t data_reloc_size;
++  int32_t data_reloc_offset;
+ 
+   /* The bss section. */
+-  unsigned long int orig_bss_address;
+-  unsigned long int bss_size;
++  uint32_t orig_bss_address;
++  uint32_t bss_size;
+ 
+   /* The symbol and string tables. */
+-  unsigned long int syms_size;
+-  long int syms_offset;
+-  unsigned long int strs_size;
+-  long int strs_offset;
++  uint32_t syms_size;
++  int32_t syms_offset;
++  uint32_t strs_size;
++  int32_t strs_offset;
+ 
+   /* The GDB symbol segment, if any. */
+-  unsigned long int symseg_size;
+-  long int symseg_offset;
++  uint32_t symseg_size;
++  int32_t symseg_offset;
+ 
+   /* Describe data from the file loaded into core */
+ 
+@@ -762,12 +762,12 @@ int data_reloc_size;		/* total size of data relocation of all input
+ 				   files.  */
+ 
+ /* The following are computed by write_header().  */
+-long int output_text_offset;	/* file offset of the text section.  */
+-long int output_data_offset;	/* file offset of the data section.  */
+-long int output_trel_offset;	/* file offset of the text relocation info.  */
+-long int output_drel_offset;	/* file offset of the data relocation info.  */
+-long int output_syms_offset;	/* file offset of the symbol table.  */
+-long int output_strs_offset;	/* file offset of the string table.  */
++int32_t output_text_offset;	/* file offset of the text section.  */
++int32_t output_data_offset;	/* file offset of the data section.  */
++int32_t output_trel_offset;	/* file offset of the text relocation info.  */
++int32_t output_drel_offset;	/* file offset of the data relocation info.  */
++int32_t output_syms_offset;	/* file offset of the symbol table.  */
++int32_t output_strs_offset;	/* file offset of the string table.  */
+ 
+ /* The following are incrementally computed by write_syms(); we keep
+    them here so we can examine their values afterwards.  */
+@@ -775,7 +775,7 @@ unsigned int output_syms_size;	/* total bytes of symbol table output. */
+ unsigned int output_strs_size;	/* total bytes of string table output. */
+ 
+ /* This can only be computed after the size of the string table is known.  */
+-long int output_symseg_offset;	/* file offset of the symbol segment (if any).  */
++int32_t output_symseg_offset;	/* file offset of the symbol segment (if any).  */
+ 
+ /* Incrementally computed by write_file_symseg().  */
+ unsigned int output_symseg_size;
+@@ -787,7 +787,7 @@ int set_sect_size;
+ 
+ /* Pointer for in core storage for the above vectors, before they are
+    written. */
+-unsigned long *set_vectors;
++uint32_t *set_vectors;
+ 
+ int *set_reloc;
+ 
+@@ -927,7 +927,7 @@ void read_a_out_header (int desc, struct file_entry *entry);
+ void read_header (int desc, struct file_entry *entry);
+ void read_entry_symbols (int desc, struct file_entry *entry);
+ void read_entry_strings (int desc, struct file_entry *entry);
+-unsigned long contains_symbol (struct file_entry *entry, struct nlist *n_ptr);
++uintptr_t contains_symbol (struct file_entry *entry, struct nlist *n_ptr);
+ void process_subentry (int desc, struct file_entry *subentry, struct file_entry *entry, struct file_entry **prev_addr);
+ void consider_file_section_lengths (struct file_entry *entry);
+ void relocate_file_addresses (struct file_entry *entry);
+@@ -947,7 +947,7 @@ void compute_section_offsets (void);
+ void compute_more_section_offsets (void);
+ void read_relocation (void);
+ int assign_string_table_index (char *name);
+-unsigned long check_each_file (register unsigned long (*function)(), register int arg);
++uint32_t check_each_file (register uint32_t (*function)(), register int arg);
+ static void     gen_deffile (void);
+ 
+ 
+@@ -1507,7 +1507,7 @@ void print_file_name (struct file_entry *entry, FILE *outfile);
+ static void
+ each_file (function, arg)
+      register void (*function)();
+-     register int arg;
++     register intptr_t arg;
+ {
+   register int i;
+ 
+@@ -1531,15 +1531,15 @@ each_file (function, arg)
+    instead, call once for each library member that is being loaded.
+ 
+    FUNCTION receives two arguments: the entry, and ARG.  It must be a
+-   function returning unsigned long (though this can probably be fudged). */
++   function returning uint32_t (though this can probably be fudged). */
+ 
+-unsigned long
++uint32_t
+ check_each_file (function, arg)
+-     register unsigned long (*function)();
++     register uint32_t (*function)();
+      register int arg;
+ {
+   register int i;
+-  register unsigned long return_val;
++  register uint32_t return_val;
+ 
+   for (i = 0; i < number_of_files; i++)
+     {
+@@ -1838,8 +1838,8 @@ read_a_out_header (desc, entry)
+   entry->strs_offset = N_STROFF(hdr);
+   lseek(desc, entry->starting_offset + entry->strs_offset, 0);
+   if (entry->syms_size &&
+-      read(desc, (char *) &entry->strs_size, sizeof (unsigned long int))
+-      != sizeof (unsigned long int))
++      read(desc, (char *) &entry->strs_size, sizeof (uint32_t))
++      != sizeof (uint32_t))
+     fatal_with_file ("failure reading string table size of ", entry);
+ 
+   if (!entry->superfile)
+@@ -1899,14 +1899,43 @@ read_entry_symbols (desc, entry)
+      struct file_entry *entry;
+      int desc;
+ {
++  struct ninfo *symbols;
++
+   if (!entry->header_read_flag)
+     read_header (desc, entry);
+ 
+-  entry->symbols = (struct nlist *) xmalloc (entry->syms_size);
++  symbols = (struct ninfo *) xmalloc (entry->syms_size);
+ 
+   lseek (desc, entry->syms_offset + entry->starting_offset, 0);
+-  if (entry->syms_size != read (desc, entry->symbols, entry->syms_size))
++  if (entry->syms_size != read (desc, symbols, entry->syms_size))
+     fatal_with_file ("premature end of file in symbols of ", entry);
++  if (sizeof (struct nlist) == sizeof (struct ninfo))
++    entry->symbols = (struct nlist *)symbols;
++  else
++    {
++      int n = entry->syms_size / sizeof (struct ninfo);
++      struct ninfo *p32;
++      struct nlist *p64;
++
++      entry->syms_size = n * sizeof (struct nlist);
++      entry->symbols = (struct nlist *) xmalloc (entry->syms_size);
++
++      p32 = symbols;
++      p64 = entry->symbols;
++      while (n-- > 0)
++        {
++          p64->n_un.n_strx = p32->n_un.n_strx;
++          p64->n_type = p32->n_type;
++          p64->n_other = p32->n_other;
++          p64->n_desc = p32->n_desc;
++          p64->n_value = p32->n_value;
++
++          p32++;
++          p64++;
++        }
++
++      free (symbols);
++    }
+ }
+ 
+ /* Read the string table of file ENTRY into core.
+@@ -2041,7 +2070,7 @@ enter_file_symbols (entry)
+           else if (s) /* hack! */
+               p->n_un.n_name = (char*)s;
+ #ifdef DEBUG
+-          else fprintf(stderr, "dbg-warning: %s - sym %d: '%s' no such symbol...\n",
++          else fprintf(stderr, "dbg-warning: %s - sym %td: '%s' no such symbol...\n",
+                        entry->filename,
+                        p - entry->symbols,
+                        p->n_un.n_strx + entry->strings);
+@@ -2057,7 +2086,7 @@ enter_file_symbols (entry)
+ 	}
+       else debugger_sym_count++;
+ #ifdef DEBUG_BIRD
+-      fprintf(stderr, "dbg: %s sym #%3d: un=%08lx typ=%02x\n",
++      fprintf(stderr, "dbg: %s sym #%3td: un=%08lx typ=%02x\n",
+               entry->filename,
+               p - entry->symbols,
+               p->n_un.n_strx,
+@@ -2156,7 +2185,7 @@ enter_global_ref (nlist_p, name, entry)
+ 	  /* Indirect symbols value should be modified to point
+ 	     a symbol being equivalenced to. */
+ 	  nlist_p->n_value
+-	    = (unsigned int) getsym ((nlist_p + 1)->n_un.n_strx
++	    = (uintptr_t) getsym ((nlist_p + 1)->n_un.n_strx
+ 				     + entry->strings);
+ 	  if ((symbol *) nlist_p->n_value == sp)
+ 	    {
+@@ -2263,7 +2292,7 @@ enter_global_ref (nlist_p, name, entry)
+ 
+       fprintf (stderr, "symbol in ");
+       print_file_name (entry, stderr);
+-      fprintf (stderr, ": %3d %s %s\n",
++      fprintf (stderr, ": %3td %s %s\n",
+                nlist_p - entry->symbols, sp->name, reftype);
+       if (free_reftype)
+         FREEA (reftype);
+@@ -2272,9 +2301,9 @@ enter_global_ref (nlist_p, name, entry)
+ 
+ /* This return 0 if the given file entry's symbol table does *not*
+    contain the nlist point entry, and it returns the files entry
+-   pointer (cast to unsigned long) if it does. */
++   pointer (cast to uint32_t) if it does. */
+ 
+-unsigned long
++uintptr_t
+ contains_symbol (entry, n_ptr)
+      struct file_entry *entry;
+      register struct nlist *n_ptr;
+@@ -2282,7 +2311,7 @@ contains_symbol (entry, n_ptr)
+   if (n_ptr >= entry->symbols &&
+       n_ptr < (entry->symbols
+ 	       + (entry->syms_size / sizeof (struct nlist))))
+-    return (unsigned long) entry;
++    return (uintptr_t) entry;
+   return 0;
+ }
+ 
+@@ -2709,8 +2738,8 @@ digest_symbols (void)
+ 
+   /* Make sure the set vectors are aligned properly. */
+   {
+-    int new_data_size = ((data_size + sizeof(unsigned long) - 1)
+-                         & ~(sizeof(unsigned long)-1));
++    int new_data_size = ((data_size + sizeof(uint32_t) - 1)
++                         & ~(sizeof(uint32_t)-1));
+ 
+     set_sect_pad += new_data_size - data_size;
+     data_size = new_data_size;
+@@ -2725,11 +2754,11 @@ digest_symbols (void)
+ 	 vector, plus a word for each symbol for a zero at the end of
+ 	 the vector (for incremental linking).  */
+       set_sect_size
+-	= (set_symbol_count + 2 * set_vector_count) * sizeof (unsigned long);
++	= (set_symbol_count + 2 * set_vector_count) * sizeof (uint32_t);
+       set_sect_start = data_start + data_size;
+       data_size += set_sect_size;
+-      set_vectors = (unsigned long *) xmalloc (set_sect_size);
+-      set_reloc = (int *) xmalloc (set_sect_size / sizeof (unsigned long)
++      set_vectors = (uint32_t *) xmalloc (set_sect_size);
++      set_reloc = (int *) xmalloc (set_sect_size / sizeof (uint32_t)
+ 				   * sizeof (int));
+       setv_fill_count = 0;
+     }
+@@ -2777,7 +2806,7 @@ digest_symbols (void)
+ 		  if (!defs++)
+ 		    {
+ 		      sp->value = set_sect_start
+-			+ setv_fill_count++ * sizeof (unsigned long);
++			+ setv_fill_count++ * sizeof (uint32_t);
+ 		      sp->defined = N_SETV | N_EXT;
+ 		      first_definition = p;
+ 		    }
+@@ -2837,7 +2866,7 @@ digest_symbols (void)
+ 		  sp->defined = N_BSS | N_EXT;
+ 		  bss_size += com;
+ 		  if (write_map)
+-		    printf ("Allocating common %s: %x at %lx\n",
++		    printf ("Allocating common %s: %x at %tx\n",
+ 			    sp->name, com, sp->value);
+ 		}
+ 	      else
+@@ -2850,9 +2879,9 @@ digest_symbols (void)
+ 	     Reverse the vector itself to put it in file order.  */
+ 	  if ((sp->defined & ~N_EXT) == N_SETV)
+ 	    {
+-	      unsigned long length_word_index
+-		= (sp->value - set_sect_start) / sizeof (unsigned long);
+-	      unsigned long i, tmp;
++	      uint32_t length_word_index
++		= (sp->value - set_sect_start) / sizeof (uint32_t);
++	      uint32_t i, tmp;
+ 
+ 	      set_reloc[length_word_index] = N_ABS;
+ 	      set_vectors[length_word_index]
+@@ -3026,7 +3055,7 @@ print_symbols (outfile)
+ 
+   fprintf (outfile, "\nFiles:\n\n");
+ 
+-  each_file (describe_file_sections, (int)outfile);
++  each_file (describe_file_sections, (intptr_t)outfile);
+ 
+   fprintf (outfile, "\nGlobal symbols:\n\n");
+ 
+@@ -3038,13 +3067,13 @@ print_symbols (outfile)
+ 	  if (sp->defined == 1)
+ 	    fprintf (outfile, "  %s: common, length 0x%x\n", sp->name, sp->max_common_size);
+ 	  if (sp->defined)
+-	    fprintf (outfile, "  %s: 0x%lx\n", sp->name, sp->value);
++	    fprintf (outfile, "  %s: 0x%tx\n", sp->name, sp->value);
+ 	  else if (sp->referenced)
+ 	    fprintf (outfile, "  %s: undefined\n", sp->name);
+ 	}
+     }
+ 
+-  each_file (list_file_locals, (int)outfile);
++  each_file (list_file_locals, (intptr_t)outfile);
+ }
+ 
+ void
+@@ -3057,7 +3086,7 @@ describe_file_sections (entry, outfile)
+   if (entry->just_syms_flag)
+     fprintf (outfile, " symbols only\n");
+   else
+-    fprintf (outfile, " text %x(%lx), data %x(%lx), bss %x(%lx) hex\n",
++    fprintf (outfile, " text %x(%x), data %x(%x), bss %x(%x) hex\n",
+ 	     entry->text_start_address, entry->text_size,
+ 	     entry->data_start_address, entry->data_size,
+ 	     entry->bss_start_address, entry->bss_size);
+@@ -3113,7 +3142,7 @@ struct line_debug_entry
+ 
+ int next_debug_entry (int use_data_symbols, struct line_debug_entry state_pointer[3]);
+ struct line_debug_entry * init_debug_scan (int use_data_symbols, struct file_entry *entry);
+-int address_to_line (unsigned long address, struct line_debug_entry state_pointer[3]);
++int address_to_line (uint32_t address, struct line_debug_entry state_pointer[3]);
+ void qsort ();
+ /*
+  * Helper routines for do_file_warnings.
+@@ -3266,7 +3295,7 @@ init_debug_scan (use_data_symbols, entry)
+ 
+ int
+ address_to_line (address, state_pointer)
+-     unsigned long address;
++     uint32_t address;
+      /* Next must be passed by reference! */
+      struct line_debug_entry state_pointer[3];
+ {
+@@ -3612,7 +3641,7 @@ do_warnings (outfile)
+     /* No need to run this routine */
+     return;
+ 
+-  each_file (do_file_warnings, (int)outfile);
++  each_file (do_file_warnings, (intptr_t)outfile);
+ 
+   if (list_unresolved_refs || list_multiple_defs)
+     make_executable = 0;
+@@ -3714,7 +3743,7 @@ compute_a_out_section_offsets (void)
+   if (strip_symbols == STRIP_NONE)
+     nsyms += debugger_sym_count;
+ 
+-  outheader.a_syms = nsyms * sizeof (struct nlist);
++  outheader.a_syms = nsyms * sizeof (struct ninfo);
+ 
+   if (output_style == OUTPUT_RELOCATABLE || reloc_flag)
+     {
+@@ -4312,7 +4341,7 @@ write_data ()
+ 
+   if (set_vector_count)
+     mywrite (set_vectors, set_symbol_count + 2 * set_vector_count,
+-	     sizeof (unsigned long), outdesc);
++	     sizeof (uint32_t), outdesc);
+ 
+   if (trace_files)
+     fprintf (stderr, "\n");
+@@ -4526,7 +4555,7 @@ perform_relocation (data, pc_relocation, data_size, reloc_info, reloc_size, entr
+ 	     Also doesn't deal with differing byte-order.  */
+ 	  {
+ 	    /* Thing to relocate.  */
+-	    long thing;
++	    int32_t thing;
+ 	    bcopy (data + addr, &thing, sizeof (thing));
+ 	    if (RELOC_MEMORY_SUB_P (p))
+ 	      relocation -= mask & thing;
+@@ -4537,11 +4566,11 @@ perform_relocation (data, pc_relocation, data_size, reloc_info, reloc_size, entr
+ 	  }
+ #else /* not CROSS_LINKER */
+ 	  if (RELOC_MEMORY_SUB_P(p))
+-	    relocation -= mask & *(long *) (data + addr);
++	    relocation -= mask & *(int32_t *) (data + addr);
+ 	  else if (RELOC_MEMORY_ADD_P(p))
+-	    relocation += mask & *(long *) (data + addr);
+-	  *(long *) (data + addr) &= ~mask;
+-	  *(long *) (data + addr) |= relocation;
++	    relocation += mask & *(int32_t *) (data + addr);
++	  *(int32_t *) (data + addr) &= ~mask;
++	  *(int32_t *) (data + addr) |= relocation;
+ #endif /* not CROSS_LINKER */
+ 	  break;
+ 
+@@ -4604,7 +4633,7 @@ write_rel ()
+   if (reloc_flag)
+     {
+       int i;
+-      int n = set_sect_size / sizeof (unsigned long);
++      int n = set_sect_size / sizeof (uint32_t);
+       struct relocation_info reloc;
+ 
+       memset (&reloc, 0, sizeof (reloc));
+@@ -4618,7 +4647,7 @@ write_rel ()
+ 	  case N_DATA:
+ 	    RELOC_SYMBOL (&reloc) = set_reloc[i] & ~N_EXT;
+ 	    RELOC_ADDRESS (&reloc)
+-	      = set_sect_start + i * sizeof (unsigned long) - data_start;
++	      = set_sect_start + i * sizeof (uint32_t) - data_start;
+ 	    mywrite (&reloc, sizeof (reloc), 1, outdesc);
+ 	    break;
+ 	  case N_ABS:
+@@ -4871,7 +4900,7 @@ write_syms ()
+ 
+   /* Write the local symbols defined by the various files.  */
+ 
+-  each_file (write_file_syms, (int)&syms_written);
++  each_file (write_file_syms, (intptr_t)&syms_written);
+   file_close ();
+ 
+   /* Now write out the global symbols.  */
+@@ -4979,8 +5008,39 @@ write_syms ()
+   /* Output the buffer full of `struct nlist's.  */
+ 
+   lseek (outdesc, output_syms_offset + output_syms_size, 0);
+-  mywrite (buf, sizeof (struct nlist), bufp - buf, outdesc);
+-  output_syms_size += sizeof (struct nlist) * (bufp - buf);
++  if (sizeof (struct nlist) == sizeof (struct ninfo))
++    {
++      mywrite (buf, sizeof (struct nlist), bufp - buf, outdesc);
++      output_syms_size += sizeof (struct nlist) * (bufp - buf);
++    }
++  else
++    {
++      struct ninfo *buf32;
++
++      struct ninfo *p32;
++      struct nlist *p64;
++
++      buf32 = (struct ninfo *) xmalloc (sizeof (struct ninfo) * (bufp - buf));
++
++      p32 = buf32;
++      p64 = buf;
++      while (p64 < bufp)
++        {
++          p32->n_un.n_strx = p64->n_un.n_strx;
++          p32->n_type = p64->n_type;
++          p32->n_other = p64->n_other;
++          p32->n_desc = p64->n_desc;
++          p32->n_value = p64->n_value;
++
++          p32++;
++          p64++;
++        }
++
++      mywrite (buf32, sizeof (struct ninfo), bufp - buf, outdesc);
++      output_syms_size += sizeof (struct ninfo) * (bufp - buf);
++
++      free (buf32);
++    }
+ 
+   if (syms_written != nsyms)
+     fatal ("internal error: wrong number of symbols written into output file", 0);
+@@ -5111,8 +5171,39 @@ write_file_syms (entry, syms_written_addr)
+   /* All the symbols are now in BUF; write them.  */
+ 
+   lseek (outdesc, output_syms_offset + output_syms_size, 0);
+-  mywrite (buf, sizeof (struct nlist), bufp - buf, outdesc);
+-  output_syms_size += sizeof (struct nlist) * (bufp - buf);
++  if (sizeof (struct nlist) == sizeof (struct ninfo))
++    {
++      mywrite (buf, sizeof (struct nlist), bufp - buf, outdesc);
++      output_syms_size += sizeof (struct nlist) * (bufp - buf);
++    }
++  else
++    {
++      struct ninfo *buf32;
++
++      struct ninfo *p32;
++      struct nlist *p64;
++
++      buf32 = (struct ninfo *) xmalloc (sizeof (struct ninfo) * (bufp - buf));
++
++      p32 = buf32;
++      p64 = buf;
++      while (p64 < bufp)
++      {
++          p32->n_un.n_strx = p64->n_un.n_strx;
++          p32->n_type = p64->n_type;
++          p32->n_other = p64->n_other;
++          p32->n_desc = p64->n_desc;
++          p32->n_value = p64->n_value;
++
++          p32++;
++          p64++;
++      }
++
++      mywrite (buf32, sizeof (struct ninfo), bufp - buf, outdesc);
++      output_syms_size += sizeof (struct ninfo) * (bufp - buf);
++
++      free (buf32);
++    }
+ 
+   /* Write the string-table data for the symbols just written,
+      using the data in vectors `strtab_vector' and `strtab_lens'.  */
+@@ -5616,7 +5707,7 @@ char *lx_to_aout (const char *pszFilename)
+  */
+ int check_lx_dll(int fd)
+ {
+-    unsigned long   ul;
++    uint32_t   ul;
+     char            achMagic[2];
+ 
+     if (    lseek(fd, 0, SEEK_SET)
+@@ -5683,7 +5774,7 @@ static void gen_deffile(void)
+                     "DATA MULTIPLE\n"
+                     "CODE SHARED\n"
+                     "\n",
+-                    cchName, pszName);
++                    (int) cchName, pszName);
+             if (trace_files)
+                 fprintf(stderr,
+                         "--- Generated def-file %s:\n"
+@@ -5692,7 +5783,7 @@ static void gen_deffile(void)
+                         "DATA MULTIPLE NONSHARED\n"
+                         "CODE SINGLE SHARED\n"
+                         "---- End of generated def-file.\n",
+-                        psz, cchName, pszName);
++                        psz, (int) cchName, pszName);
+             fclose(pFile);
+             def_filename = psz;
+ 
+diff --git a/src/emx/src/libomflib/omflib0.h b/src/emx/src/libomflib/omflib0.h
+index 55844c4..22183f2 100644
+--- a/src/emx/src/libomflib/omflib0.h
++++ b/src/emx/src/libomflib/omflib0.h
+@@ -9,7 +9,7 @@
+ #define _BYTE_WORD_DWORD
+ typedef unsigned char byte;
+ typedef unsigned short word;
+-typedef unsigned long dword;
++typedef unsigned int dword;     /* komh: was unsigned long */
+ #endif /* _BYTE_WORD_DWORD */
+ 
+ #define FLAG_DELETED  0x0001
+@@ -37,7 +37,7 @@ struct pubsym
+ struct omflib
+ {
+   FILE *f;
+-  long dict_offset;
++  int dict_offset;              /* komh: was long */
+   int page_size;
+   int dict_blocks;
+   int flags;
+-- 
+2.28.0
+

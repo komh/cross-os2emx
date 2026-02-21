@@ -1,0 +1,38 @@
+From 71b261fbefcd21abd8113fe0e5741ca4c44d8746 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 22:19:14 +0900
+Subject: [PATCH 3/3] weakld: fix crash in WLDDestroy()
+
+Trying to fclose() the already fclose()ed file pointer causes a
+crash. This occurs if pMod->phFile is the same as
+pMod->pLib->phFile.
+---
+ src/emx/src/emxomf/weakld.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/emx/src/emxomf/weakld.c b/src/emx/src/emxomf/weakld.c
+index da316f9..10d14b2 100644
+--- a/src/emx/src/emxomf/weakld.c
++++ b/src/emx/src/emxomf/weakld.c
+@@ -989,6 +989,18 @@ static int          libLoadUndefSymbols(PWLD pWld, PWLDLIB pLib, PWLDSYM pSym, u
+                 pWld->ppObjsAdd = &pMod->pNext;
+ 
+                 rc = pass1ReadOMFMod(pWld, pMod, 1);
++                /*
++                 * komh:
++                 * Close module here, otherwise crashes in WLDDestroy() if
++                 * pMod->phFile is the same as pLib->phFile here.
++                 * Because libClose() calls fclose() for pLib->phFile and set
++                 * it to NULL, and modClose() calls fclose() for pMod->phFile
++                 * if !pLib and pLib->phFile != pMod->phFile, but  pLib->phFile
++                 * is already NULL and pMod->phFile has the old value of
++                 * pLib->phFile already closed by fclose(). As a result,
++                 * CRASH!
++                 * */
++                modClose(pMod);
+                 if (rc)
+                 {
+                     libErr(pLib, "Failed when reading module at offset %x.", (int)offCurMod);
+-- 
+2.28.0
+

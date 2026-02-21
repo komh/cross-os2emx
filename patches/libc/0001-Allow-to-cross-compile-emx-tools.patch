@@ -1,0 +1,2120 @@
+From e992c9c011c784b42d507e975d7b934f8d38c031 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 21:58:01 +0900
+Subject: [PATCH 1/3] Allow to cross-compile emx tools
+
+---
+ src/emx/Makefile.cross                 |  51 +++
+ src/emx/common.cross                   | 175 ++++++++++
+ src/emx/src/emxbind/Makefile.cross     |  47 +++
+ src/emx/src/emxbind/emxbind.c          |   4 +
+ src/emx/src/emxbind/exec.c             |   7 +
+ src/emx/src/emxbind/fixup.c            |   1 +
+ src/emx/src/emxbind/map.c              |   4 +
+ src/emx/src/emxbind/resource.c         |   7 +
+ src/emx/src/emxbind/utils.c            |   8 +
+ src/emx/src/emxexp/Makefile.cross      |  35 ++
+ src/emx/src/emxexp/emxexp.c            |   2 +
+ src/emx/src/emximp/Makefile.cross      |  33 ++
+ src/emx/src/emximp/emximp.c            |  11 +
+ src/emx/src/emxomf/Makefile.cross      |  41 +++
+ src/emx/src/emxomf/emxaout.c           |   7 +
+ src/emx/src/emxomf/emxomf.c            |  20 ++
+ src/emx/src/emxomf/emxomfar.c          |  13 +
+ src/emx/src/emxomf/emxomfld.c          |  83 ++++-
+ src/emx/src/emxomf/grow.c              |   5 +
+ src/emx/src/emxomf/stripomf.c          |   8 +
+ src/emx/src/emxomf/weakld.c            |  12 +
+ src/emx/src/ld/Makefile.cross          |  35 ++
+ src/emx/src/ld/ld.c                    |  50 ++-
+ src/emx/src/libcrossemx/Makefile.cross |  33 ++
+ src/emx/src/libcrossemx/crossemx.c     | 442 +++++++++++++++++++++++++
+ src/emx/src/libcrossemx/crossemx.h     |  99 ++++++
+ src/emx/src/libmoddef/Makefile.cross   |  33 ++
+ src/emx/src/libmoddef/moddef1.c        |   8 +
+ src/emx/src/libmoddef/moddef2.c        |   4 +
+ src/emx/src/libomflib/Makefile.cross   |  35 ++
+ src/emx/src/libomflib/omflibam.c       |   4 +
+ src/emx/src/libomflib/omflibcr.c       |   4 +
+ src/emx/src/libomflib/omflibdl.c       |   4 +
+ src/emx/src/libomflib/omflibex.c       |   3 +
+ src/emx/src/libomflib/omflibrd.c       |   4 +
+ src/emx/src/libomflib/omflibut.c       |   5 +
+ 36 files changed, 1332 insertions(+), 5 deletions(-)
+ create mode 100644 src/emx/Makefile.cross
+ create mode 100644 src/emx/common.cross
+ create mode 100644 src/emx/src/emxbind/Makefile.cross
+ create mode 100644 src/emx/src/emxexp/Makefile.cross
+ create mode 100644 src/emx/src/emximp/Makefile.cross
+ create mode 100644 src/emx/src/emxomf/Makefile.cross
+ create mode 100644 src/emx/src/ld/Makefile.cross
+ create mode 100644 src/emx/src/libcrossemx/Makefile.cross
+ create mode 100644 src/emx/src/libcrossemx/crossemx.c
+ create mode 100644 src/emx/src/libcrossemx/crossemx.h
+ create mode 100644 src/emx/src/libmoddef/Makefile.cross
+ create mode 100644 src/emx/src/libomflib/Makefile.cross
+
+diff --git a/src/emx/Makefile.cross b/src/emx/Makefile.cross
+new file mode 100644
+index 0000000..7997049
+--- /dev/null
++++ b/src/emx/Makefile.cross
+@@ -0,0 +1,51 @@
++## @file
++#
++# Main makefile to cross-compile emx-tools.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of InnoTek LIBC.
++#
++# InnoTek LIBC is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# InnoTek LIBC is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++SUBDIRS := libcrossemx libomflib libmoddef emxexp emximp emxbind ld emxomf
++
++SRCDIR := src
++MAKEFILE_CROSS := Makefile.cross
++
++PREFIXROOT := $(HOME)
++
++.PHONY: all build clean install
++
++all: build
++
++build:
++	for d in $(SUBDIRS); do \
++	  $(MAKE) -C $(SRCDIR)/$$d -f $(MAKEFILE_CROSS); \
++	done
++
++clean:
++	for d in $(SUBDIRS); do \
++	  $(MAKE) -C $(SRCDIR)/$$d -f $(MAKEFILE_CROSS) clean; \
++	done
++
++install: build
++	for d in $(SUBDIRS); do \
++	  $(MAKE) -C $(SRCDIR)/$$d -f $(MAKEFILE_CROSS) install \
++	    DESTDIR=$(DESTDIR) PREFIXROOT=$(PREFIXROOT); \
++	done
+diff --git a/src/emx/common.cross b/src/emx/common.cross
+new file mode 100644
+index 0000000..62d81fb
+--- /dev/null
++++ b/src/emx/common.cross
+@@ -0,0 +1,175 @@
++## @file
++#
++# Common makefile to cross-compile emx-tools.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of InnoTek LIBC.
++#
++# InnoTek LIBC is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# InnoTek LIBC is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++ifeq ($(EMXDIR),)
++$(error EMXDIR is required!)
++endif
++
++ifeq ($(SRCDIR),)
++$(error SRCDIR is required!)
++endif
++
++include $(EMXDIR)/version.smak
++
++OUTDIR := $(EMXDIR)/out/i686-pc-os2-emx
++
++CC := gcc
++CFLAGS := -std=gnu99 -D_GNU_SOURCE -Wall -I. -I$(SRCDIR) \
++          -idirafter $(EMXDIR)/src/libcrossemx \
++          -idirafter $(EMXDIR)/src/include -idirafter $(EMXDIR)/include \
++          $(CFLAGS.DEF.VERSION) -g
++
++LD := gcc
++LDFLAGS := -L$(OUTDIR) -L$(BINUTILSDIR)/libiberty
++LDLIBS := -lomflib -lmoddef -lcrossemx
++
++ifneq ($(BINUTILSDIR),)
++CFLAGS := -I$(BINUTILSDIR)/include $(CFLAGS)
++LDFLAGS := $(LDFLAGS) \
++           -L$(BINUTILSDIR)/libiberty -L$(BINUTILSDIR)/build/libiberty
++LDLIBS := $(LDLIBS) -liberty
++endif
++
++AR := ar
++ARFLAGS := cru
++
++DEPEXT := .d
++OBJEXT := .o
++EXEEXT :=
++LIBEXT := .a
++
++.SUFFIXES: .c $(DEPEXT) $(OBJEXT) $(EXEEXT) $(LIBEXT)
++
++PREFIXROOT := $(HOME)
++PREFIX := $(patsubst %/,%,$(PREFIXROOT))/opt/os2emx
++BINDIR := $(PREFIX)/bin
++LIBDIR := $(PREFIX)/lib
++INCDIR := $(PREFIX)/include
++
++TARGETSPEC := i686-pc-os2-emx
++TARGETPREFIX := $(PREFIX)/$(TARGETSPEC)
++TARGETBINDIR := $(TARGETPREFIX)/bin
++TARGETLIBDIR := $(TARGETPREFIX)/lib
++TARGETINCDIR := $(TARGETPREFIX)/include
++
++MKDIR_P := mkdir -p
++RM := rm -f
++INSTALL := install
++LN_S := ln -s
++
++CLEANFILES :=
++
++define exe_template
++$(1)_OBJS := $(addprefix $(OUTDIR)/, $(addsuffix $(OBJEXT), $($(1)_SRCS)))
++$(1)_DEPS := $(addprefix $(OUTDIR)/, $(addsuffix $(DEPEXT), $($(1)_SRCS)))
++
++$$($(1)_OBJS) $$($(1)_DEPS): CFLAGS += $($(1)_CFLAGS)
++
++$(1)_TARGET := $(OUTDIR)/$(1)$(EXEEXT)
++
++$$($(1)_TARGET): $$($(1)_OBJS)
++	$(LD) $(LDFLAGS) $$($(1)_LDFLAGS) -o $$@ $$($(1)_OBJS) $(LDLIBS) $$($(1)_LDLIBS)
++
++all: $$($(1)_TARGET)
++
++install-exe: $$($(1)_TARGET)
++
++install: install-exe
++
++ifeq ($(filter %clean,$(MAKECMDGOALS)),)
++-include $$($(1)_DEPS)
++endif
++
++CLEANFILES += $$($(1)_OBJS) $$($(1)_DEPS) $$($(1)_TARGET)
++endef
++
++define lib_template
++$(1)_OBJS := $(addprefix $(OUTDIR)/, $(addsuffix $(OBJEXT), $($(1)_SRCS)))
++$(1)_DEPS := $(addprefix $(OUTDIR)/, $(addsuffix $(DEPEXT), $($(1)_SRCS)))
++
++$$($(1)_OBJS) $$($(1)_DEPS): CFLAGS += $($(1)_CFLAGS)
++
++$(1)_TARGET := $(OUTDIR)/$(1)$(LIBEXT)
++
++$$($(1)_TARGET): $$($(1)_OBJS)
++	$(AR) $(ARFLAGS) $$($(1)_ARFLAGS) -o $$@ $$($(1)_OBJS)
++
++all: $$($(1)_TARGET)
++
++install-lib: $$($(1)_TARGET)
++
++#install: install-lib
++
++ifeq ($(filter %clean,$(MAKECMDGOALS)),)
++-include $$($(1)_DEPS)
++endif
++
++CLEANFILES += $$($(1)_OBJS) $$($(1)_DEPS) $$($(1)_TARGET)
++endef
++
++$(shell $(MKDIR_P) $(OUTDIR))
++
++$(OUTDIR)/%.c$(DEPEXT): $(SRCDIR)/%.c
++	$(CC) $(CFLAGS) -M -MP -MT "$(@:$(DEPEXT)=$(OBJEXT)) $@" -MF $@ $<
++
++$(OUTDIR)/%.c$(OBJEXT): $(SRCDIR)/%.c
++	$(CC) $(CFLAGS) -c -o $@ $<
++
++.PHONY: all clean install install-exe install-lib
++
++all:
++
++clean:
++	$(RM) $(CLEANFILES)
++
++install-exe:
++	$(INSTALL) -d $(DESTDIR)$(TARGETBINDIR)
++	$(INSTALL) -d $(DESTDIR)$(BINDIR)
++	for f in $^; do \
++	  $(INSTALL) $$f $(DESTDIR)$(TARGETBINDIR); \
++	  n=$$(basename $$f); \
++	  if test "$$n" != "os2stub.bin" -a \
++	          "$$n" != "ldstub.bin" ; then \
++		 $(LN_S) -f ../$(TARGETSPEC)/bin/$$n \
++	                $(DESTDIR)$(BINDIR)/$(TARGETSPEC)-$$n; \
++	  fi; \
++	  if test "$$n" != "ld"$(EXEEXT) -a \
++	          "$$n" != "os2stub.bin" -a \
++	          "$$n" != "ldstub.bin" ; then \
++	    $(LN_S) -f ../$(TARGETSPEC)/bin/$$n \
++	               $(DESTDIR)$(BINDIR)/$$n; \
++	  fi; \
++	done
++
++intall-lib:
++	$(INSTALL) -d $(DESTDIR)$(TARGETLIBDIR)
++	for f in $^; do \
++	  $(INSTALL) $$f $(DESTDIR)$(TARGETLIBDIR); \
++	done
++
++install: all
++
++$(foreach t, $(TARGETEXES), $(eval $(call exe_template,$(t))))
++$(foreach t, $(TARGETLIBS), $(eval $(call lib_template,$(t))))
+diff --git a/src/emx/src/emxbind/Makefile.cross b/src/emx/src/emxbind/Makefile.cross
+new file mode 100644
+index 0000000..fc7fce4
+--- /dev/null
++++ b/src/emx/src/emxbind/Makefile.cross
+@@ -0,0 +1,47 @@
++## @file
++#
++# Makefile to cross-compile emxbind.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of emxbind.
++#
++# emxbind is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# emxbind is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++TARGETEXES := emxbind
++
++emxbind_SRCS := cmd.c emxbind.c exec.c export.c fixup.c map.c resource.c \
++                utils.c
++
++include $(EMXDIR)/common.cross
++
++# add rules for os2stub.bin
++
++TARGET_os2stub := $(OUTDIR)/os2stub.bin
++
++all: $(TARGET_os2stub)
++
++$(TARGET_os2stub): $(SRCDIR)/os2stub.bin
++	cp $< $@
++
++install-exe: $(TARGET_os2stub)
++
++CLEANFILES += $(TARGET_os2stub)
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index f59f953..8f67631 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -26,9 +26,13 @@ Boston, MA 02111-1307, USA.  */
+ #include <string.h>
+ #include <getopt.h>
+ #include <sys/moddef.h>
++#include <errno.h>
+ #include "defs.h"
+ #include "emxbind.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ /* The name of the module definition file (set by the -d option) or
+    NULL (if there is no module definition file).  If it's the empty
+diff --git a/src/emx/src/emxbind/exec.c b/src/emx/src/emxbind/exec.c
+index 5dee9c9..31e4a5d 100644
+--- a/src/emx/src/emxbind/exec.c
++++ b/src/emx/src/emxbind/exec.c
+@@ -23,10 +23,17 @@ Boston, MA 02111-1307, USA.  */
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/moddef.h>
++#ifdef __EMX__
+ #include <sys/user.h>
++#else
++#include "../../emx/include/sys/user.h"
++#endif
+ #include "defs.h"
+ #include "emxbind.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ /* The first DOS EXE header read from emxl.exe or emx.exe. */
+ 
+diff --git a/src/emx/src/emxbind/fixup.c b/src/emx/src/emxbind/fixup.c
+index 02b316d..eb6684c 100644
+--- a/src/emx/src/emxbind/fixup.c
++++ b/src/emx/src/emxbind/fixup.c
+@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
+ #include <stdlib.h>
+ #include <string.h>
+ #include <alloca.h>
++#include <errno.h>
+ #include "defs.h"
+ #include "emxbind.h"
+ 
+diff --git a/src/emx/src/emxbind/map.c b/src/emx/src/emxbind/map.c
+index 6a0578b..bad7807 100644
+--- a/src/emx/src/emxbind/map.c
++++ b/src/emx/src/emxbind/map.c
+@@ -26,6 +26,10 @@ Boston, MA 02111-1307, USA.  */
+ #include "defs.h"
+ #include "emxbind.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ struct map_sym
+ {
+   dword addr;
+diff --git a/src/emx/src/emxbind/resource.c b/src/emx/src/emxbind/resource.c
+index 8418e4f..4814889 100644
+--- a/src/emx/src/emxbind/resource.c
++++ b/src/emx/src/emxbind/resource.c
+@@ -19,12 +19,19 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
++#ifndef __EMX__
++#define _SYS__TYPES_H_
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include "defs.h"
+ #include "emxbind.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ /* Flags for resources. */
+ 
+diff --git a/src/emx/src/emxbind/utils.c b/src/emx/src/emxbind/utils.c
+index dcb8954..61b81ea 100644
+--- a/src/emx/src/emxbind/utils.c
++++ b/src/emx/src/emxbind/utils.c
+@@ -19,6 +19,10 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
++#ifndef __EMX__
++#define _SYS__TYPES_H_
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+@@ -26,7 +30,11 @@ Boston, MA 02111-1307, USA.  */
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
++#ifdef __EMX__
+ #include <io.h>
++#else
++#include <unistd.h>
++#endif
+ #include "defs.h"
+ #include "emxbind.h"
+ 
+diff --git a/src/emx/src/emxexp/Makefile.cross b/src/emx/src/emxexp/Makefile.cross
+new file mode 100644
+index 0000000..3a44c43
+--- /dev/null
++++ b/src/emx/src/emxexp/Makefile.cross
+@@ -0,0 +1,35 @@
++## @file
++#
++# Makefile to cross-compile emxexp.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of emxexp.
++#
++# emxexp is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# emxexp is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++BINUTILSDIR := ../../../../../binutils-os2
++
++TARGETEXES := emxexp
++
++emxexp_SRCS := emxexp.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/emxexp/emxexp.c b/src/emx/src/emxexp/emxexp.c
+index 09b3e32..d4b5353 100644
+--- a/src/emx/src/emxexp/emxexp.c
++++ b/src/emx/src/emxexp/emxexp.c
+@@ -953,8 +953,10 @@ int main (int argc, char **argv)
+   int c, i;
+   char *p;
+ 
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#endif
+   opterr = 0;
+   optind = 0;
+   while ((c = getopt (argc, argv, "no::uw")) != EOF)
+diff --git a/src/emx/src/emximp/Makefile.cross b/src/emx/src/emximp/Makefile.cross
+new file mode 100644
+index 0000000..a3ad6df
+--- /dev/null
++++ b/src/emx/src/emximp/Makefile.cross
+@@ -0,0 +1,33 @@
++## @file
++#
++# Makefile to cross-compile emximp.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of emximp.
++#
++# emximp is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# emximp is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++TARGETEXES := emximp
++
++emximp_SRCS := emximp.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/emximp/emximp.c b/src/emx/src/emximp/emximp.c
+index e866cc4..7bcae03 100644
+--- a/src/emx/src/emximp/emximp.c
++++ b/src/emx/src/emximp/emximp.c
+@@ -22,6 +22,11 @@ Boston, MA 02111-1307, USA.  */
+ 
+ #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+ 
++#ifndef __EMX__
++/* disable to include sys/types.h of EMX */
++#define _SYS__TYPES_H_
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+@@ -108,6 +113,10 @@ static void write_a_import (const char *func_name, const char *mod_name,
+     int ordinal, const char *proc_name);
+ 
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ static void usage (void)
+ {
+   puts ("emximp " VERSION VERSION_DETAILS
+@@ -1473,7 +1482,9 @@ int main (int argc, char *argv[])
+   struct predef *pp1;
+   char *q, *ext, *opt_o;
+ 
++#ifdef __EMX__
+   _response (&argc, &argv);
++#endif
+   predefs = NULL; out_base = NULL; as_name = NULL; pipe_flag = FALSE;
+   profile_flag = FALSE; page_size = 16;
+   opt_b = FALSE; opt_q = FALSE; opt_s = FALSE; base_len = 0; opt_o = NULL;
+diff --git a/src/emx/src/emxomf/Makefile.cross b/src/emx/src/emxomf/Makefile.cross
+new file mode 100644
+index 0000000..4ea47dc
+--- /dev/null
++++ b/src/emx/src/emxomf/Makefile.cross
+@@ -0,0 +1,41 @@
++## @file
++#
++# Makefile to cross-compile emxomf tools.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of emxomf.
++#
++# emxomf is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# emxomf is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++BINUTILSDIR := ../../../../../binutils-os2
++
++TARGETEXES := emxomf emxomfar emxomfld emxomfstrip emxaout listomf stripomf
++
++emxomf_SRCS := emxomf.c stabshll.c grow.c
++emxomfar_SRCS := emxomfar.c
++emxomfld_SRCS := emxomfld.c grow.c weakld.c
++emxomfstrip_SRCS := emxomfstrip.c
++emxaout_SRCS := emxaout.c grow.c
++listomf_SRCS := listomf.c
++stripomf_SRCS := stripomf.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/emxomf/emxaout.c b/src/emx/src/emxomf/emxaout.c
+index 0b92dc1..0d45d04 100644
+--- a/src/emx/src/emxomf/emxaout.c
++++ b/src/emx/src/emxomf/emxaout.c
+@@ -32,6 +32,11 @@ Boston, MA 02111-1307, USA.  */
+ #include <sys/omflib.h>
+ #include <ar.h>
+ #include <a_out.h>
++#include <errno.h>
++
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ #define GROW_DEF_STATIC(NAME,TYPE) \
+   static struct grow NAME##_grow; \
+@@ -1350,8 +1355,10 @@ int main (int argc, char *argv[])
+   /* Expand response files (@filename) and wildcard (*.o) on the
+      command line. */
+ 
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#endif
+ 
+   /* Set default values of some options. */
+ 
+diff --git a/src/emx/src/emxomf/emxomf.c b/src/emx/src/emxomf/emxomf.c
+index 07932b1..977ddbc 100644
+--- a/src/emx/src/emxomf/emxomf.c
++++ b/src/emx/src/emxomf/emxomf.c
+@@ -35,6 +35,8 @@ Boston, MA 02111-1307, USA.  */
+ #include <sys/time.h>
+ #include <ar.h>
+ #include <assert.h>
++#include <errno.h>
++#include <unistd.h>
+ 
+ /* Insert private header files. */
+ 
+@@ -47,6 +49,10 @@ Boston, MA 02111-1307, USA.  */
+ 
+ #include <sys/omflib.h>         /* Handling OMF libraries */
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ /* Flag bits for FLAGS field of the struct symbol structure. */
+ 
+ #define SF_FAR16        0x01    /* 16:16 pointer */
+@@ -2845,12 +2851,14 @@ static void write_export (void)
+ 
+ static void convert_filename (char *name)
+ {
++#ifdef __EMX__
+   while (*name != 0)
+     {
+       if (*name == '/')
+         *name = '\\';
+       ++name;
+     }
++#endif
+ }
+ 
+ #if 0
+@@ -2943,9 +2951,14 @@ static void get_mod_name (void)
+     {
+       getcwd(base_dir, sizeof(base_dir));
+       len = strlen(base_dir);
++#ifdef __EMX__
+       base_dir[len++] = '\\';
++#else
++      base_dir[len++] = '/';
++#endif
+       base_dir[len] = '\0';
+     }
++#ifdef __EMX__
+   else if (   (base_dir[0] == '\\' ||  base_dir[0] == '/')
+            &&  base_dir[1] != '\\' &&  base_dir[1] != '/') /* unc */
+     {   /* make it absolute using current drive */
+@@ -2954,6 +2967,7 @@ static void get_mod_name (void)
+       base_dir[0] = _getdrive();
+       base_dir[1] = ':';
+     }
++#endif
+ }
+ 
+ 
+@@ -3779,9 +3793,13 @@ static void open_output (void)
+         fprintf (response_file, " &\n");
+       tmp = alloca (strlen (out_fname) + 1);
+       strcpy (tmp, out_fname);
++#ifdef __EMX__
+       for (p = tmp; *p != 0; ++p)
+         if (*p == '/')
+           *p = '\\';
++#else
++      (void) p; /* komh: make compiler happy */
++#endif
+       fprintf (response_file, "%s %s", (response_replace ? "-+" : "+"), tmp);
+     }
+ }
+@@ -4143,6 +4161,7 @@ int main (int argc, char *argv[])
+   char *opt_o, *opt_O, *tmp;
+   struct libreq *lrp;
+ 
++#ifdef __EMX__
+   /* Keep emxomf in memory for the number of minutes indicated by the
+      GCCLOAD environment variable. */
+ 
+@@ -4155,6 +4174,7 @@ int main (int argc, char *argv[])
+   _envargs (&argc, &argv, "EMXOMFOPT");
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#endif
+ 
+   /* Set default values of some options. */
+ 
+diff --git a/src/emx/src/emxomf/emxomfar.c b/src/emx/src/emxomf/emxomfar.c
+index a46801d..26e6cd1 100644
+--- a/src/emx/src/emxomf/emxomfar.c
++++ b/src/emx/src/emxomf/emxomfar.c
+@@ -18,15 +18,26 @@ along with emxomfar; see the file COPYING.  If not, write to
+ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
++#ifndef __EMX__
++/* disable to include sys/types.h of EMX */
++#define _SYS__TYPES_H_
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#ifdef __EMX__
+ #include <io.h>
++#else
++#include <unistd.h>
++#endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/omflib.h>
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ #define FALSE 0
+ #define TRUE  1
+@@ -248,8 +259,10 @@ int main (int argc, char *argv[])
+ 
+   /* Expand response files and wildcards on th command line. */
+ 
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#endif
+ 
+   /* The default page size was 16, now we'll calculate one with 
+      a minimum of 16. */
+diff --git a/src/emx/src/emxomf/emxomfld.c b/src/emx/src/emxomf/emxomfld.c
+index bc9011f..7cbd0d2 100644
+--- a/src/emx/src/emxomf/emxomfld.c
++++ b/src/emx/src/emxomf/emxomfld.c
+@@ -21,25 +21,45 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
++#ifndef __EMX__
++/* disable to include sys/types.h of EMX */
++#define _SYS__TYPES_H_
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <alloca.h>
+ #include <errno.h>
+ #include <string.h>
+ #include <process.h>
++#ifdef __EMX__
+ #include <io.h>
++#else
++#include <unistd.h>
++#endif
+ #include <fcntl.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#include <sys/time.h>
+ #include <sys/utime.h>
+ #include <sys/moddef.h>
+ #include <getopt.h>
+ #include <alloca.h>
+ #include <sys/omflib.h>
++#ifdef __EMX__
+ #include <InnoTekLIBC/FastInfoBlocks.h>
++#endif
+ #include "defs.h"
+ #include "weakld.h"
+ 
++#ifdef __EMX__
++#define EXEEXT ".exe"
++#else
++#include "crossemx.h"
++
++#define EXEEXT ""
++#endif
++
+ #define FALSE 0
+ #define TRUE  1
+ 
+@@ -157,21 +177,37 @@ static int stack_size_flag = 0;
+ 
+ /* The name of the linker to use.  By default, ilink is used.  This
+    can be overridden with the EMXOMFLD_LINKER environment variable. */
++#ifdef __EMX__
+ static const char *linker_name = "ilink.exe";
++#else
++static const char *linker_name = "wl";
++#endif
+ 
+ /* The type of linker to use. By default we assume it's VAC365 or later
+    version of ilink. This can be overridden with the EMXOMFLD_TYPE env.
+    var. using any of the values WLINK, VAC365, VAC308 and LINK386. */
++#ifdef __EMX__
+ static const char *linker_type = "VAC365";
++#else
++static const char *linker_type = "WLINK";
++#endif
+ 
+ /* The name of the resource compiler to use.  By default, rc is used.
+    This can be overridden with the EMXOMFLD_RC environment variable. */
++#ifdef __EMX__
+ static const char *rc_name = "rc.exe";
++#else
++static const char *rc_name = "wrc";
++#endif
+ 
+ /* The type of resource compiler to use. By default we assume it's
+    IBM resource compiler. This can be overridden with the EMXOMFLD_RC_TYPE
+    env. var. using any of the values RC, WRC. */
++#ifdef __EMX__
+ static const char *rc_type = "RC";
++#else
++static const char *rc_type = "WRC";
++#endif
+ 
+ /* Non-zero if emxomfld should automatically convert a.out objects and
+    archives to the OMF equivalents during linking. */
+@@ -307,6 +343,25 @@ static void open_response_file(void)
+         exit (2);
+       }
+     close(fd);
++#ifndef __EMX__
++    /* komh: wlink on Linux does not like a file name without an extention.
++       Appending '.' is not enough. */
++    if (!stricmp (linker_type, "WLINK"))
++      {
++        char wl_response_fname[L_tmpnam];
++
++        strcpy (wl_response_fname, response_fname);
++        strcat (wl_response_fname, ".lnk");
++        if (rename (response_fname, wl_response_fname) == -1)
++          {
++            perror ("emxomfld");
++            exit (2);
++          }
++
++        strcpy (response_fname, wl_response_fname);
++      }
++
++#endif
+     response_file = fopen (response_fname, "wt");
+     if (response_file == NULL)
+       {
+@@ -320,8 +375,10 @@ static void open_response_file(void)
+     command_line[line_len++] = ' ';
+     command_line[line_len++] = '@';
+     strcpy (command_line+line_len, response_fname);
++#ifdef __EMX__
+     if (!stricmp (linker_type, "WLINK"))
+       strcat (command_line, ".");
++#endif
+ 
+     if (force_response_file)
+       force_response_file = FALSE;
+@@ -332,11 +389,13 @@ static void open_response_file(void)
+ 
+ static void conv_path (char *name)
+ {
++#ifdef __EMX__
+   char *p;
+ 
+   for (p = name; *p != 0; ++p)
+     if (*p == '/')
+       *p = '\\';
++#endif
+ }
+ 
+ 
+@@ -687,7 +746,11 @@ static int      make_tempfile(char *pszFile, const char *pszPrefix, const char *
+         if (c++ >= 200)
+             return -1;
+         gettimeofday(&tv, NULL);
++#ifdef __EMX__
+         sprintf(pszFile, "%s\\%s%s%x%x%d%lx%s", s_szTmp, pszPrefix, pszLooklike, pid, tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#else
++        sprintf(pszFile, "%s/%s%s%x%llx%d%lx%s", s_szTmp, pszPrefix, pszLooklike, pid, (long long) tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#endif
+     } while (!stat(pszFile, &s));
+ 
+     return 0;
+@@ -731,7 +794,7 @@ static FILE *aout_to_omf(FILE *pf, char *pszFilename, int fLibrary)
+     /*
+      * Do the conversion.
+      */
+-    rc = spawnlp(P_WAIT, "emxomf.exe", "emxomf.exe", "-o", pszNewFile, pszFilename, NULL);
++    rc = spawnlp(P_WAIT, "emxomf" EXEEXT, "emxomf" EXEEXT, "-o", pszNewFile, pszFilename, NULL);
+     if (!rc)
+     {
+         /* open the file */
+@@ -798,7 +861,7 @@ static FILE *lx_to_omf(FILE *pf, char *pszFilename)
+     /*
+      * Do the conversion.
+      */
+-    rc = spawnlp(P_WAIT, "emximp.exe", "emximp.exe", "-o", pszNewFile, pszFilename, NULL);
++    rc = spawnlp(P_WAIT, "emximp" EXEEXT, "emximp" EXEEXT, "-o", pszNewFile, pszFilename, NULL);
+     if (!rc)
+     {
+         /* open the file */
+@@ -860,8 +923,12 @@ static FILE *find_obj(char *pszFullname, const char *pszName)
+     }
+ 
+     psz = pszFullname;
++#ifdef __EMX__
+     while ((psz = strchr(psz, '/')) != NULL)
+       *psz++ = '\\';
++#else
++    (void) psz; /* make compiler happy */
++#endif
+ 
+     /*
+      * Try open the file.
+@@ -977,7 +1044,11 @@ static FILE *find_lib(char *pszFullname, const char *pszName, int fShared)
+     if (!fPath)
+     {
+         cchCurPath = 2;
++#ifdef __EMX__
+         memcpy(pszFullname, ".\\", 2);
++#else
++        memcpy(pszFullname, "./", 2);
++#endif
+     }
+     pszLibPath = getenv("LIB");
+     do
+@@ -1029,9 +1100,11 @@ static FILE *find_lib(char *pszFullname, const char *pszName, int fShared)
+                         free(pszTmp);
+                     }
+ 
++#ifdef __EMX__
+                     /* Replace forward slashes with backslashes (link386). */
+                     while ((pszFullname = strchr(pszFullname, '/')) != NULL)
+                       *pszFullname++ = '\\';
++#endif
+                     return phFile;
+                 }
+             } /* next prefix */
+@@ -1059,7 +1132,11 @@ static FILE *find_lib(char *pszFullname, const char *pszName, int fShared)
+                 /* Append last slash if it is not there */
+                 if (   pszFullname[cchCurPath - 1] != '/'
+                     && pszFullname[cchCurPath - 1] != '\\')
++#ifdef __EMX__
+                     pszFullname[cchCurPath++] = '\\';
++#else
++                    pszFullname[cchCurPath++] = '/';
++#endif
+                 break;
+               }
+             if (!*psz)
+@@ -1645,8 +1722,10 @@ int main (int argc, char *argv[])
+ 
+   /* Get options from response files (@filename) and wildcard (*.o) on the command. */
+ 
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#endif
+ 
+   /* Close and delete the response file on exit. */
+ 
+diff --git a/src/emx/src/emxomf/grow.c b/src/emx/src/emxomf/grow.c
+index d868f59..0b990ce 100644
+--- a/src/emx/src/emxomf/grow.c
++++ b/src/emx/src/emxomf/grow.c
+@@ -34,12 +34,17 @@ Boston, MA 02111-1307, USA.  */
+    pool. */
+ 
+ #include <stdlib.h>
++#include <stdint.h>
+ #include <string.h>
+ #include <ctype.h>
+ #include <assert.h>
+ #include "defs.h"
+ #include "grow.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ /* A program using this module has to define the following two
+    functions: */
+ 
+diff --git a/src/emx/src/emxomf/stripomf.c b/src/emx/src/emxomf/stripomf.c
+index a7ed2ef..90f4406 100644
+--- a/src/emx/src/emxomf/stripomf.c
++++ b/src/emx/src/emxomf/stripomf.c
+@@ -32,10 +32,16 @@
+ #include <string.h>
+ #ifdef __EMX__
+ #include <io.h>
++#else
++#include <unistd.h>
+ #endif
+ #include <sys/omflib.h>
+ #include "defs.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ /*******************************************************************************
+ *   Defined Constants And Macros                                               *
+ *******************************************************************************/
+@@ -325,8 +331,10 @@ int main(int argc, char **argv)
+     int argi;
+ 
+     pszPgm = mybasename(argv[0]);
++#ifdef __EMX__
+     _response (&argc, &argv);
+     _wildcard (&argc, &argv);
++#endif
+ 
+ #ifdef __EMX__
+     if (_isterm (1))
+diff --git a/src/emx/src/emxomf/weakld.c b/src/emx/src/emxomf/weakld.c
+index 3d3f7c5..7d69844 100644
+--- a/src/emx/src/emxomf/weakld.c
++++ b/src/emx/src/emxomf/weakld.c
+@@ -91,6 +91,11 @@
+ /*******************************************************************************
+ *   Header Files                                                               *
+ *******************************************************************************/
++#ifndef __EMX__
++/* disable to include sys/types.h of EMX */
++#define _SYS__TYPES_H_
++#endif
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+@@ -106,6 +111,9 @@
+ #include "grow.h"
+ #include "weakld.h"
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ /*******************************************************************************
+ *   Structures and Typedefs                                                    *
+@@ -3667,7 +3675,11 @@ static int      wldTempFile(PWLD pWld, char *pszFile, const char *pszPrefix, con
+         if (c++ >= 200)
+             return -1;
+         gettimeofday(&tv, NULL);
++#ifdef __EMX__
+         sprintf(pszFile, "%s\\%s%x%x%d%lx%s", s_szTmp, pszPrefix, pid, tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#else
++        sprintf(pszFile, "%s/%s%x%llx%d%lx%s", s_szTmp, pszPrefix, pid, (long long)tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#endif
+     } while (!stat(pszFile, &s));
+ 
+     return 0;
+diff --git a/src/emx/src/ld/Makefile.cross b/src/emx/src/ld/Makefile.cross
+new file mode 100644
+index 0000000..73a6eca
+--- /dev/null
++++ b/src/emx/src/ld/Makefile.cross
+@@ -0,0 +1,35 @@
++## @file
++#
++# Makefile to cross-compile ld.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of ld.
++#
++# ld is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# ld is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++BINUTILSDIR := ../../../../../binutils-os2
++
++TARGETEXES := ld
++
++ld_SRCS := ld.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index 4b2829c..a5d6bda 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -29,9 +29,16 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
++#include <stdint.h>
+ #include <limits.h>
++#ifdef __EMX__
+ #include <io.h>
++
+ #include <process.h>
++#else
++#include <unistd.h>
++#include <sys/wait.h>
++#endif
+ #include <errno.h>
+ #include <utime.h>
+ #include <ctype.h>
+@@ -42,9 +49,7 @@
+ #include <sys/time.h>
+ #include <sys/resource.h>
+ #endif
+-#ifdef __EMX__
+ #include <string.h>
+-#endif
+ #include "libiberty.h"
+ 
+ #if !defined(A_OUT)
+@@ -60,6 +65,10 @@
+ #endif
+ extern int _System DosCopy (char *, char *, int);
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ /* We need .data of every module aligned to at least 16 bound
+    in order to support the alignments required by SSE. 
+    Ditto for constants in .text. */
+@@ -130,6 +139,12 @@ char *progname;
+ #define SEEK_CUR 1
+ #endif
+ 
++#ifdef __EMX__
++#define EXEEXT ".exe"
++#else
++#define EXEEXT ""
++#endif
++
+ /*
+  * Ok.  Following are the relocation information macros.  If your
+  * system cannot use the default set (below), you must define all of these:
+@@ -943,9 +958,13 @@ main (argc, argv)
+      char **argv;
+      int argc;
+ {
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
+   page_size = getpagesize ();
++#else
++  page_size = 4096;
++#endif
+   progname = argv[0];
+ 
+ #ifdef RLIMIT_STACK
+@@ -4004,6 +4023,17 @@ write_output (void)
+             fprintf(stderr, " %s", nargv[i]);
+           fprintf(stderr, "\n");
+         }
++#ifndef __EMX__
++      {
++        char path[512];
++
++        /* Try find first in the same directory as ld */
++        _execname (path, sizeof (path));
++        strcpy (_getname (path), "emxbind");
++        i = spawnvp (P_WAIT, path, nargv);
++      }
++      if (i < 0)
++#endif
+       i = spawnvp (P_WAIT, "emxbind", nargv);
+       saved_errno = errno; unlink (output_filename); errno = saved_errno;
+       if (i < 0)
+@@ -5354,6 +5384,7 @@ void
+ perror_name (name)
+      char *name;
+ {
++#ifdef __EMX__
+   char *s;
+ 
+   if (errno < sys_nerr)
+@@ -5361,6 +5392,9 @@ perror_name (name)
+   else
+     s = "cannot open %s";
+   fatal (s, name);
++#else
++  fatal ("%s for %s", strerror (errno), name);
++#endif
+ }
+ 
+ /* Report a fatal error using the message for the last failed system call,
+@@ -5370,6 +5404,7 @@ void
+ perror_file (entry)
+      struct file_entry *entry;
+ {
++#ifdef __EMX__
+   char *s;
+ 
+   if (errno < sys_nerr)
+@@ -5377,6 +5412,11 @@ perror_file (entry)
+   else
+     s = "cannot open ";
+   fatal_with_file (s, entry);
++#else
++  char s[512];
++  snprintf (s, sizeof (s), "%s for ", strerror (errno ));
++  fatal_with_file (s, entry);
++#endif
+ }
+ 
+ /* Report a nonfatal error.
+@@ -5507,7 +5547,11 @@ static int      make_tempfile(char *pszFile, const char *pszPrefix, const char *
+         if (c++ >= 200)
+             return -1;
+         gettimeofday(&tv, NULL);
++#ifdef __EMX__
+         sprintf(pszFile, "%s\\%s%x%x%d%lx%s", pszTmp, pszPrefix, pid, tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#else
++        sprintf(pszFile, "%s/%s%x%jx%d%lx%s", pszTmp, pszPrefix, pid, (intmax_t) tv.tv_sec, c, tv.tv_usec, pszSuffix);
++#endif
+     } while (!stat(pszFile, &s));
+ 
+     return 0;
+@@ -5543,7 +5587,7 @@ char *lx_to_aout (const char *pszFilename)
+     /*
+      * Do the conversion.
+      */
+-    rc = spawnlp(P_WAIT, "emximp.exe", "emximp.exe",
++    rc = spawnlp(P_WAIT, "emximp" EXEEXT, "emximp" EXEEXT,
+                  "-o", pszNewFile, pszFilename, NULL);
+     if (!rc)
+     {
+diff --git a/src/emx/src/libcrossemx/Makefile.cross b/src/emx/src/libcrossemx/Makefile.cross
+new file mode 100644
+index 0000000..d918aa2
+--- /dev/null
++++ b/src/emx/src/libcrossemx/Makefile.cross
+@@ -0,0 +1,33 @@
++## @file
++#
++# Makefile for libcrossemx
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of libcrossemx.
++#
++# libcrossemx is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# libcrossemx is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++TARGETLIBS := libcrossemx
++
++libcrossemx_SRCS := crossemx.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/libcrossemx/crossemx.c b/src/emx/src/libcrossemx/crossemx.c
+new file mode 100644
+index 0000000..faf05a0
+--- /dev/null
++++ b/src/emx/src/libcrossemx/crossemx.c
+@@ -0,0 +1,442 @@
++/* crossemx.c -- Provide EMX functions for non-EMX hosts
++   Copyright (c) 1993-1998 Eberhard Mattes
++   Copyright (c) 2026 KO Myung-Hun
++
++This file is part of libcrossemx.
++
++libcrossemx is free software; you can redistribute it and/or modify it
++under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++libcroxxems is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with emxexp; see the file COPYING.  If not, write to
++the Free Software Foundation, 59 Temple Place - Suite 330,
++Boston, MA 02111-1307, USA.  */
++
++/** @file */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <string.h>
++#include <ctype.h>
++#include <sys/param.h>
++#include <sys/wait.h>
++#include <errno.h>
++
++#include "crossemx.h"
++
++/* stdlib.h */
++
++unsigned char _osmode = OS2_MODE;
++
++/* komh: make compiler happy */
++static int __libc_GLocaleCtype __attribute__((unused));
++/* komh: disable DBCS check */
++#define CHK_MBCS_PREFIX(p, c, v) (0)
++
++#define FALSE   0
++#define TRUE    1
++
++/* from libc, defext.c */
++void _defext (char *dst, const char *ext)
++{
++  int dot, sep, mbcl;
++
++  dot = FALSE; sep = TRUE;
++  while (*dst != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, *dst, mbcl))
++      {
++        if (dst[1] == 0)        /* Invalid DBCS character */
++          return;
++        dst += mbcl;
++        sep = FALSE;
++      }
++    else
++      switch (*dst++)
++        {
++        case '.':
++          dot = TRUE;
++          sep = FALSE;
++          break;
++        case ':':
++        case '/':
++        case '\\':
++          dot = FALSE;
++          sep = TRUE;
++          break;
++        default:
++          sep = FALSE;
++          break;
++        }
++  if (!dot && !sep)
++    {
++      *dst++ = '.';
++      strcpy (dst, ext);
++    }
++}
++
++/* from libc, getext.c */
++char *_getext (const char *path)
++{
++  int sep, mbcl;
++  const char *dotp;
++
++  sep = TRUE; dotp = NULL;
++  while (*path != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, *path, mbcl))
++      {
++        if (path[1] == 0)       /* Invalid DBCS character */
++          break;
++        path += mbcl;
++        sep = FALSE;
++      }
++    else
++      switch (*path++)
++        {
++        case '.':
++          /* Note that PATH has been incremented. */
++          dotp = (sep ? NULL : path - 1);
++          sep = FALSE;
++          break;
++        case ':':
++        case '/':
++        case '\\':
++          dotp = NULL;
++          sep = TRUE;
++          break;
++        default:
++          sep = FALSE;
++          break;
++        }
++  return (char *)dotp;
++}
++
++/* from libc, getext2.c */
++char *_getext2 (const char *path)
++{
++  char *p;
++
++  p = _getext (path);
++  return (p != NULL ? p : "");
++}
++
++/* from libc, getname.c */
++char *_getname (const char *path)
++{
++  const char *p;
++  int mbcl;
++
++  p = path;
++  while (*path != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, *path, mbcl))
++      {
++        if (path[1] == 0)       /* Invalid DBCS character */
++          break;
++        path += mbcl;
++      }
++    else
++      switch (*path++)
++        {
++        case ':':
++        case '/':
++        case '\\':
++          p = path;             /* Note that PATH has been incremented */
++          break;
++        }
++  return (char *)p;
++}
++
++/* from libc, remext.c */
++void _remext (char *path)
++{
++  int dot, sep, mbcl;
++  char *dotp;
++
++  dot = FALSE; sep = TRUE; dotp = NULL;
++  while (*path != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, *path, mbcl))
++      {
++        if (path[1] == 0)       /* Invalid DBCS character */
++          break;
++        path += mbcl;
++        sep = FALSE;
++      }
++    else
++      switch (*path++)
++        {
++        case '.':
++          /* Note that PATH has been incremented. */
++          dotp = (sep ? NULL : path - 1);
++          dot = TRUE;
++          sep = FALSE;
++          break;
++        case ':':
++        case '/':
++        case '\\':
++          dot = FALSE;
++          sep = TRUE;
++          break;
++        default:
++          sep = FALSE;
++          break;
++        }
++  if (dot && dotp != NULL)
++    *dotp = 0;
++}
++
++/* from libc, splitpat.c */
++void _splitpath (const char *src, char *drive, char *dir, char *fname,
++                 char *ext)
++{
++  int i, j, mbcl;
++
++  i = 0;
++  while (src[i] != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, src[i], mbcl))
++      {
++        if (src[i+1] == 0)      /* Invalid DBCS character */
++          break;
++        i += mbcl;
++      }
++    else if (src[i] == ':')
++      break;
++    else
++      ++i;
++
++  if (i > 0 && i + 2 <= _MAX_DRIVE && src[i] == ':')
++    {
++      if (drive != NULL)
++        _strncpy (drive, src, MIN (i+2, _MAX_DRIVE));
++      src += i + 1;
++    }
++  else if (drive != NULL)
++    *drive = 0;
++
++  i = 0; j = 0;
++  while (src[j] != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, src[j], mbcl))
++      {
++        if (src[j+1] == 0)      /* Invalid DBCS character */
++          break;
++        j += mbcl;
++      }
++    else if (src[j] == '/' || src[j] == '\\')
++      i = ++j;
++    else
++      ++j;
++
++  if (dir != NULL)
++    _strncpy (dir, src, MIN (_MAX_DIR, i + 1));
++  src += i;
++
++  i = 0; j = 0;
++  while (src[j] != 0)
++    if (CHK_MBCS_PREFIX (&__libc_GLocaleCtype, src[j], mbcl))
++      {
++        if (src[j+1] == 0)      /* Invalid DBCS character */
++          break;
++        j += mbcl;
++      }
++    else if (src[j] == '.')
++      i = j++;
++    else
++      ++j;
++
++  if (i == 0)
++    i = j;
++  if (fname != NULL)
++    _strncpy (fname, src, MIN (_MAX_FNAME, i + 1));
++  src += i;
++
++  if (ext != NULL)
++    _strncpy (ext, src, _MAX_EXT);
++}
++
++int _execname (char *buf, size_t bufsize)
++{
++  ssize_t len;
++
++  if ((len = readlink ("/proc/self/exe", buf, bufsize - 1)) == -1)
++    return -1;
++
++  buf[len] = '\0';
++  return 0;
++}
++
++char *_realrealpath (const char *path, char *resolved, size_t size)
++{
++  char *fullpath;
++  int sz;
++
++  fullpath = realpath (path, NULL);
++  if (fullpath == NULL)
++    return NULL;
++
++  if (resolved == NULL)
++    return fullpath;
++
++  sz = strlen (fullpath) + 1;
++  if (size >= sz)
++    memcpy (resolved, fullpath, sz);
++  else
++    {
++      errno = ERANGE; /* komh: as kLIBC does */
++      resolved = NULL;
++    }
++
++  free (fullpath);
++
++  return resolved;
++}
++
++int _fullpath (char *dst, const char *src, int size)
++{
++  if (dst == NULL)
++    {
++      errno = EINVAL;
++      return -1;
++    }
++
++  if (_realrealpath (src, dst, size) == NULL)
++    return -1;
++
++  return 0;
++}
++
++/* process.h */
++
++/* for spawnvp (P_WAIT) */
++int spawnvp (int mode, const char *name, char * const argv[])
++{
++  int status;
++  int err;
++  int pid = fork();
++
++  if (pid == -1)
++    return -1;
++
++  if (pid == 0)
++    {
++      execvp (name, argv);
++      _exit (127);
++    }
++
++  while ((err = waitpid (pid, &status, 0)) == -1 && errno == EINTR)
++    /* nothing */;
++
++  if (err == -1)
++    return -1;
++
++  if (WIFSIGNALED (status))
++    return 128 + WTERMSIG (status);
++
++  if (WIFEXITED (status))
++    return WEXITSTATUS (status);
++
++  /* possible? */
++  return -1;
++}
++
++/* for spawnlp (P_WAIT) */
++int spawnlp (int mode, const char *name, const char *arg0, ...)
++{
++  int argc;
++  char **argv;
++  va_list ap;
++  int err;
++
++  va_start (ap, arg0);
++
++  for (argc = 1; va_arg (ap, char *) != NULL; argc++)
++    /* nothing */;
++
++  va_end (ap);
++
++  argv = malloc (sizeof (argv[0]) * (argc + 1));
++  if (argv == NULL)
++    return -1;
++
++  va_start (ap, arg0);
++
++  argv[0] = (char *)arg0;
++  for (int i = 1; i <= argc; i++ )
++      argv[i] = va_arg (ap, char *);
++
++  va_end (ap);
++
++  err = spawnvp (mode, name, argv);
++
++  free (argv);
++
++  return err;
++}
++
++/* os2emx.h */
++
++int _System DosCopy (char *src, char *dst, int option)
++{
++  return spawnlp (P_WAIT, "cp", "cp", "-n", src, dst, NULL);
++}
++
++/* string.h */
++
++int memicmp (const void *s1, const void *s2, size_t n)
++{
++  const unsigned char *p1 = (const unsigned char *)s1;
++  const unsigned char *p2 = (const unsigned char *)s2;
++  size_t i;
++
++  for (i = 0; i < n; ++i)
++    {
++      int c1 = tolower(p1[i]);
++      int c2 = tolower(p2[i]);
++
++      if (c1 < c2) return -1;
++      if (c1 > c2) return 1;
++    }
++
++  return 0;
++}
++
++/* from libc, _strncpy.c */
++char *_strncpy (char *string1, const char *string2, size_t size)
++{
++  if (size > 0)
++    {
++      while (size > 1 && *string2 != 0)
++        {
++          *string1++ = *string2++;
++          --size;
++        }
++      *string1 = 0;
++    }
++  return string1;
++}
++
++char *strupr (char *str)
++{
++  char *s;
++
++  for (s = str; *s; s++)
++    *s = toupper (*s);
++
++  return str;
++}
++
++char *strlwr (char *str)
++{
++  char *s;
++
++  for (s = str; *s; s++)
++    *s = tolower (*s);
++
++  return str;
++}
+diff --git a/src/emx/src/libcrossemx/crossemx.h b/src/emx/src/libcrossemx/crossemx.h
+new file mode 100644
+index 0000000..a998116
+--- /dev/null
++++ b/src/emx/src/libcrossemx/crossemx.h
+@@ -0,0 +1,99 @@
++/* crossemx.h -- Header file for libcrossemx
++   Copyright (c) 1993-1998 Eberhard Mattes
++   Copyright (c) 2026 KO Myung-Hun
++
++This file is part of libcrossemx.
++
++libcrossemx is free software; you can redistribute it and/or modify it
++under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++libcroxxems is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with emxexp; see the file COPYING.  If not, write to
++the Free Software Foundation, 59 Temple Place - Suite 330,
++Boston, MA 02111-1307, USA.  */
++
++#ifndef EMX_CROSSEMX_H
++#define EMX_CROSSEMX_H
++
++/* stdlib.h */
++#define DOS_MODE 0
++#define OS2_MODE 1
++
++#define _MAX_PATH   260
++#define _MAX_DRIVE    3
++#define _MAX_DIR    256
++#define _MAX_FNAME  256
++#define _MAX_EXT    256
++
++extern unsigned char _osmode;
++
++void _defext (char *dst, const char *ext);
++char *_getext (const char *path);
++char *_getext2 (const char *path);
++char *_getname (const char *path);
++void _remext (char *path);
++void _splitpath (const char *src, char *drive, char *dir, char *fname,
++                 char *ext);
++int _execname (char *buf, size_t bufsize);
++char *_realrealpath(const char *path, char *resolved, size_t size);
++int _fullpath (char *dst, const char *src, int size);
++
++/* fcntl.h */
++#define O_BINARY 0
++
++/* string.h */
++#define stricmp strcasecmp
++#define strnicmp strncasecmp
++
++char *_strncpy (char *string1, const char *string2, size_t size);
++char *strupr (char *str);
++char *strlwr (char *str);
++
++/* process.h */
++#define P_WAIT 0
++
++int spawnvp (int mode, const char *name, char * const argv[]);
++int spawnlp (int mode, const char *name, const char *arg0, ...);
++
++/* os2emx.h */
++#ifndef _System
++#define _System
++#endif
++
++int _System DosCopy (char *src, char *dst, int option);
++
++/* string.h */
++int memicmp (const void *s1, const void *s2, size_t n);
++
++/* stdio.h */
++/* komh: ignore shflag currently */
++#define _fsopen(fname, mode, shflag) fopen ((fname), (mode))
++#define fputchar(c) fputc ((c), stdout)
++
++/* sys/param.h */
++#define PAGE_SHIFT  12        /* LOG2(PAGE_SIZE) */
++#define PAGE_SIZE   (1<<PAGE_SHIFT)     /* bytes/page */
++#define PAGE_MASK   (PAGE_SIZE-1)
++
++#define round_page(x)   (((x) + PAGE_MASK) & ~PAGE_MASK)
++
++/* InnoTekLIBC/FastInfoBlocks.h */
++#include <time.h>
++static inline long fibGetMsCount (void)
++{
++  struct timespec ts;
++
++  clock_gettime (CLOCK_MONOTONIC, &ts);
++  return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
++}
++
++/* io.h */
++#define _chsize(fd, size) ftruncate ((fd), (size))
++#endif
+diff --git a/src/emx/src/libmoddef/Makefile.cross b/src/emx/src/libmoddef/Makefile.cross
+new file mode 100644
+index 0000000..76d9971
+--- /dev/null
++++ b/src/emx/src/libmoddef/Makefile.cross
+@@ -0,0 +1,33 @@
++## @file
++#
++# Makefile to cross-compile libmoddef.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of libmoddef.
++#
++# libmoddef is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# libmoddef is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++TARGETLIBS := libmoddef
++
++libmoddef_SRCS := moddef1.c moddef2.c moddef3.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/libmoddef/moddef1.c b/src/emx/src/libmoddef/moddef1.c
+index c0792fc..c42ca34 100644
+--- a/src/emx/src/libmoddef/moddef1.c
++++ b/src/emx/src/libmoddef/moddef1.c
+@@ -8,7 +8,12 @@
+ #include <errno.h>
+ #include <sys/moddef.h>
+ 
++#ifdef __EMX__
+ #define ERRNO (*_errno ())
++#else
++#include "crossemx.h"
++#define ERRNO errno
++#endif
+ 
+ #define MDF_OPEN 0x0001
+ 
+@@ -161,6 +166,9 @@ static int get_line (struct _md *md)
+     }
+   p = strchr (md->buffer, '\n');
+   if (p != NULL) *p = 0;
++#ifndef __EMX__
++  if (p != NULL && p > md->buffer && p[-1] == '\r') *--p = 0;
++#endif
+   md->ptr = md->buffer;
+   ++md->linenumber;
+   return 0;
+diff --git a/src/emx/src/libmoddef/moddef2.c b/src/emx/src/libmoddef/moddef2.c
+index 51ecd6e..e1ce6b7 100644
+--- a/src/emx/src/libmoddef/moddef2.c
++++ b/src/emx/src/libmoddef/moddef2.c
+@@ -4,6 +4,10 @@
+ #include <string.h>
+ #include <sys/moddef.h>
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ #define FALSE 0
+ #define TRUE  1
+ 
+diff --git a/src/emx/src/libomflib/Makefile.cross b/src/emx/src/libomflib/Makefile.cross
+new file mode 100644
+index 0000000..b038203
+--- /dev/null
++++ b/src/emx/src/libomflib/Makefile.cross
+@@ -0,0 +1,35 @@
++## @file
++#
++# Makefile to cross-compile libomflib.
++#
++# Copyright (c) 2026 KO Myung-Hun <komh78@gmail.com>
++#
++#
++# This file is part of libomflib.
++#
++# libomflib is free software; you can redistribute it and/or modify
++# it under the terms of the GNU Lesser General Public License as published
++# by the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# libomflib is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU Lesser General Public License for more details.
++#
++# You should have received a copy of the GNU Lesser General Public License
++# along with InnoTek LIBC; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++#
++#
++
++EMXDIR := ../..
++SRCDIR := .
++
++TARGETLIBS := libomflib
++
++libomflib_SRCS := omflibam.c omflibap.c omflibcl.c omflibcp.c omflibcr.c \
++                  omflibdl.c omflibex.c omflibpb.c omflibrd.c omflibut.c \
++				  omflibwr.c
++
++include $(EMXDIR)/common.cross
+diff --git a/src/emx/src/libomflib/omflibam.c b/src/emx/src/libomflib/omflibam.c
+index 22f5ea7..7368c57 100644
+--- a/src/emx/src/libomflib/omflibam.c
++++ b/src/emx/src/libomflib/omflibam.c
+@@ -8,6 +8,10 @@
+ #include "omflib0.h"
+ #include <sys/omflib.h>
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ int omflib_add_module (struct omflib *p, const char *fname, char *error)
+ {
+   FILE *f;
+diff --git a/src/emx/src/libomflib/omflibcr.c b/src/emx/src/libomflib/omflibcr.c
+index 21f1534..e33048a 100644
+--- a/src/emx/src/libomflib/omflibcr.c
++++ b/src/emx/src/libomflib/omflibcr.c
+@@ -10,6 +10,10 @@
+ #include <sys/omflib.h>
+ 
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ struct omflib *omflib_create (const char *fname, int page_size, char *error)
+ {
+   struct omflib *p;
+diff --git a/src/emx/src/libomflib/omflibdl.c b/src/emx/src/libomflib/omflibdl.c
+index eeea763..dd63ae8 100644
+--- a/src/emx/src/libomflib/omflibdl.c
++++ b/src/emx/src/libomflib/omflibdl.c
+@@ -9,6 +9,10 @@
+ #include <sys/omflib.h>
+ 
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ int omflib_mark_deleted (struct omflib *p, const char *name, char *error)
+ {
+   char buf[256];
+diff --git a/src/emx/src/libomflib/omflibex.c b/src/emx/src/libomflib/omflibex.c
+index 18016cd..e1cf1d2 100644
+--- a/src/emx/src/libomflib/omflibex.c
++++ b/src/emx/src/libomflib/omflibex.c
+@@ -8,6 +8,9 @@
+ #include "omflib0.h"
+ #include <sys/omflib.h>
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ int omflib_extract (struct omflib *p, const char *name, char *error)
+ {
+diff --git a/src/emx/src/libomflib/omflibrd.c b/src/emx/src/libomflib/omflibrd.c
+index 2df8e25..26fe23f 100644
+--- a/src/emx/src/libomflib/omflibrd.c
++++ b/src/emx/src/libomflib/omflibrd.c
+@@ -10,6 +10,10 @@
+ #include <sys/omflib.h>
+ 
+ 
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
++
+ struct omflib *omflib_open (const char *fname, char *error)
+ {
+   FILE *f;
+diff --git a/src/emx/src/libomflib/omflibut.c b/src/emx/src/libomflib/omflibut.c
+index c417613..8802b7f 100644
+--- a/src/emx/src/libomflib/omflibut.c
++++ b/src/emx/src/libomflib/omflibut.c
+@@ -7,6 +7,11 @@
+ #include <string.h>
+ #include "omflib0.h"
+ #include <sys/omflib.h>
++#include <errno.h>
++
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ int omflib_set_error (char *error)
+ {
+-- 
+2.28.0
+

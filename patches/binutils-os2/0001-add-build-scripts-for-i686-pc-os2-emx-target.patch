@@ -1,0 +1,40 @@
+From 5417a04275f07f5a6ae69050432bc29fe6075da8 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 15:16:00 +0900
+Subject: [PATCH 1/2] add build scripts for i686-pc-os2-emx target
+
+---
+ conf-os2emx-cross | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100755 conf-os2emx-cross
+
+diff --git a/conf-os2emx-cross b/conf-os2emx-cross
+new file mode 100755
+index 00000000..dcdfc651
+--- /dev/null
++++ b/conf-os2emx-cross
+@@ -0,0 +1,21 @@
++#! /bin/sh
++
++PREFIXROOT=${PREFIXROOT:-$HOME}
++
++prefix=${PREFIXROOT%/}/opt/os2emx
++target=i686-pc-os2-emx
++
++export CFLAGS="-DEMX -O2"
++export CXXFLAGS="-DEMX -O2"
++
++opts="
++    --prefix=$prefix
++    --target=$target
++    --disable-nls
++    --disable-gold
++    --disable-ld
++    --disable-lto
++    --disable-plugins
++"
++
++$(dirname "$0")/configure $opts "$@"
+-- 
+2.28.0
+

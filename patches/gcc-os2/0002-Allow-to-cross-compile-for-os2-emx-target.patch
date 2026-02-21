@@ -1,0 +1,273 @@
+From 4ed1f2dc6120616032f7cc4ffe493c3888f8eee4 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Fri, 20 Feb 2026 18:55:01 +0900
+Subject: [PATCH 2/2] Allow to cross-compile for *-os2-emx target
+
+---
+ gcc/Makefile.in               |  2 +-
+ gcc/config/i386/emx-driver.c  |  2 ++
+ gcc/config/i386/emx.h         | 10 ++++++++++
+ gcc/config/i386/i386.c        | 12 ++++++------
+ gcc/config/i386/i386.h        |  2 +-
+ gcc/config/i386/predicates.md |  2 +-
+ gcc/config/i386/t-emx         |  2 +-
+ gcc/cp/dump.c                 |  6 +++---
+ gcc/genattrtab.c              |  2 +-
+ gcc/reg-stack.c               |  4 ++--
+ libstdc++-v3/crossconfig.m4   |  6 ++++++
+ 11 files changed, 34 insertions(+), 16 deletions(-)
+
+diff --git a/gcc/Makefile.in b/gcc/Makefile.in
+index 945d92881..8414f6260 100644
+--- a/gcc/Makefile.in
++++ b/gcc/Makefile.in
+@@ -421,7 +421,7 @@ LIBDECNUMBER = ../libdecnumber/libdecnumber.a
+ # The backtrace library.
+ BACKTRACE = $(srcdir)/../libbacktrace
+ BACKTRACEINC = -I$(BACKTRACE)
+-LIBBACKTRACE = ../libbacktrace/.libs/backtrace.a
++LIBBACKTRACE = ../libbacktrace/.libs/libbacktrace.a
+ 
+ # Target to use when installing include directory.  Either
+ # install-headers-tar, install-headers-cpio or install-headers-cp.
+diff --git a/gcc/config/i386/emx-driver.c b/gcc/config/i386/emx-driver.c
+index 4299c7e61..391148e6e 100644
+--- a/gcc/config/i386/emx-driver.c
++++ b/gcc/config/i386/emx-driver.c
+@@ -35,12 +35,14 @@ emx_driver_init (unsigned int *decoded_options_count,
+ {
+     unsigned int i;
+ 
++#ifdef __EMX__
+     /* Preload compiler if specified by GCCLOAD for faster subsequent runs */
+     _emxload_env ("GCCLOAD");
+     /* Compilers don't fork (thanks God!) so we can use >32MB RAM */ 
+     /* bird: this doesn't matter really as the compiler now should use high */
+     /*       memory. But we'll leave it here in case a DLL gets broken. */
+     _uflags (_UF_SBRK_MODEL, _UF_SBRK_ARBITRARY);
++#endif
+ 
+   for (i = 1; i < *decoded_options_count; i++)
+     {
+diff --git a/gcc/config/i386/emx.h b/gcc/config/i386/emx.h
+index 1409bb6f1..93b0343e7 100644
+--- a/gcc/config/i386/emx.h
++++ b/gcc/config/i386/emx.h
+@@ -48,8 +48,10 @@ Boston, MA 02111-1307, USA.  */
+ #include <stdio.h>              /* for FILE* */
+ 
+ /* Some additional system-dependent includes... */
++#ifdef __EMX__
+ #include <sys/emxload.h>
+ #include <sys/uflags.h>
++#endif
+ 
+ /* Generate stack probes for allocations bigger than 4000. */
+ #define CHECK_STACK_LIMIT               4000
+@@ -458,7 +460,11 @@ do {                                                                    \
+ #define ENDFILE_SPEC "%{Zomf:-lend}"
+ 
+ /* Override the default linker program (collect2).  */
++#ifdef __EMX__
+ #define LINKER_NAME                     "%{Zomf:emxomf}ld.exe"
++#else
++#define LINKER_NAME                     "%{Zomf:emxomf}ld"
++#endif
+ 
+ 
+ 
+@@ -531,7 +537,11 @@ do {                                                                    \
+ #define ENDFILE_SPEC "%{!Zaout:-lend}"
+ 
+ /* Override the default linker program (collect2).  */
++#ifdef __EMX__
+ #define LINKER_NAME "%{!Zaout:emxomf}ld.exe"
++#else
++#define LINKER_NAME "%{!Zaout:emxomf}ld"
++#endif
+ 
+ #endif
+ 
+diff --git a/gcc/config/i386/i386.c b/gcc/config/i386/i386.c
+index 907ff2f33..d83f30316 100644
+--- a/gcc/config/i386/i386.c
++++ b/gcc/config/i386/i386.c
+@@ -34,7 +34,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "stringpool.h"
+ #include "expmed.h"
+ #include "optabs.h"
+-#ifdef __EMX__
++#if defined(__EMX__) || defined(EMX)
+ #include "cp/cp-tree.h" /* we need SET_DECL_LANGUAGE */
+ #include "dbxout.h"
+ #endif
+@@ -115,7 +115,7 @@ static void ix86_emit_restore_reg_using_pop (rtx);
+ #define CHECK_STACK_LIMIT (-1)
+ #endif
+ 
+-#ifdef EMX
++#if defined(__EMX__) || defined(EMX)
+ extern bool i386_emx_binds_local_p (const_tree);
+ #endif
+ 
+@@ -6643,7 +6643,7 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args,
+     }
+ #endif
+ 
+-#ifdef __EMX__
++#if defined(__EMX__) || defined(EMX)
+   /* Be compatible with IBM VAC and imply `extern "C"' for certain calling
+      conventions when they are used on functions in C++ code.  It may be a good
+      idea to use a target-specific compiler option for that in the future.  */
+@@ -15788,7 +15788,7 @@ ix86_legitimate_constant_p (machine_mode mode, rtx x)
+       if (SYMBOL_REF_TLS_MODEL (x))
+ 	return false;
+ 
+-#ifndef __EMX__ /* 2009-01-15 */
++#if !defined(__EMX__) && !defined(EMX) /* 2009-01-15 */
+       /* DLLIMPORT symbols are never valid.  */
+       if (TARGET_DLLIMPORT_DECL_ATTRIBUTES
+ 	  && SYMBOL_REF_DLLIMPORT_P (x))
+@@ -17155,7 +17155,7 @@ ix86_legitimize_address (rtx x, rtx, machine_mode mode)
+       return gen_rtx_PLUS (Pmode, t, XEXP (XEXP (x, 0), 1));
+     }
+ 
+-#ifndef __EMX__ /* 2009-01-15 */
++#if !defined(__EMX__) && !defined(EMX) /* 2009-01-15 */
+   if (TARGET_DLLIMPORT_DECL_ATTRIBUTES)
+     {
+       rtx tmp = legitimize_pe_coff_symbol (x, true);
+@@ -52014,7 +52014,7 @@ ix86_run_selftests (void)
+ #define TARGET_BINDS_LOCAL_P ix86_binds_local_p
+ #endif
+ #if TARGET_DLLIMPORT_DECL_ATTRIBUTES
+-#ifndef __EMX__
++#if !defined(__EMX__) && !defined(EMX)
+ #undef TARGET_BINDS_LOCAL_P
+ #define TARGET_BINDS_LOCAL_P i386_pe_binds_local_p
+ #else
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index eacf62969..937677cff 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -1656,7 +1656,7 @@ typedef struct ix86_args {
+   enum calling_abi call_abi;	/* Set to SYSV_ABI for sysv abi. Otherwise
+  				   MS_ABI for ms abi.  */
+   tree decl;			/* Callee decl.  */
+-#ifdef __EMX__
++#if defined(__EMX__) || defined(EMX)
+   int fpu_regno;		/* next available FPU register number */
+   int fpu_nregs;		/* # registers available for passing */
+   int ec_slots;			/* # eyecatcher slots left (see optlink specs) */
+diff --git a/gcc/config/i386/predicates.md b/gcc/config/i386/predicates.md
+index 7d49fd495..029d2c291 100644
+--- a/gcc/config/i386/predicates.md
++++ b/gcc/config/i386/predicates.md
+@@ -603,7 +603,7 @@
+   if (ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC
+       || flag_force_indirect_call)
+     return false;
+-#ifndef __EMX__ /* mangles dllimport symbols in a bad way on OS/2 */
++#if !defined(__EMX__) && !defined(EMX) /* mangles dllimport symbols in a bad way on OS/2 */
+   if (TARGET_DLLIMPORT_DECL_ATTRIBUTES && SYMBOL_REF_DLLIMPORT_P (op))
+     return false;
+ #endif
+diff --git a/gcc/config/i386/t-emx b/gcc/config/i386/t-emx
+index 00e3243ef..6e9b99e4b 100644
+--- a/gcc/config/i386/t-emx
++++ b/gcc/config/i386/t-emx
+@@ -58,7 +58,7 @@ STMP_FIXPROTO   =
+ TARGET_LIBGCC2_CFLAGS = -Zaout -O2 -fomit-frame-pointer -Wall -DNDEBUG
+ 
+ # Allocate enough stack and use high memory
+-T_CFLAGS = -Zstack 8192 -Zhigh-mem
++#T_CFLAGS = -Zstack 8192 -Zhigh-mem
+ 
+ # Provide alternative source code for libgcc1
+ LIBGCC1         = libgcc1-asm.a
+diff --git a/gcc/cp/dump.c b/gcc/cp/dump.c
+index fa192b9ed..0ee457578 100644
+--- a/gcc/cp/dump.c
++++ b/gcc/cp/dump.c
+@@ -23,7 +23,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "coretypes.h"
+ #include "cp-tree.h"
+ #include "tree-dump.h"
+-#ifdef __EMX__
++#if defined(__EMX__) || defined(EMX)
+ #include "stringpool.h"
+ #include "attribs.h"
+ #endif
+@@ -51,7 +51,7 @@ dump_stmt (dump_info_p di, const_tree t)
+     dump_int (di, "line", EXPR_LINENO (t));
+ }
+ 
+-#if __EMX__ /* bird hacking */
++#if defined(__EMX__) || defined(EMX) /* bird hacking */
+ static void cp_dump_attributes (dump_info_p di, tree t)
+ {
+   tree attr = NULL;
+@@ -91,7 +91,7 @@ cp_dump_tree (void* dump_info, tree t)
+ 	dump_string_field (di, "lang", language_to_string (DECL_LANGUAGE (t)));
+     }
+ 
+-#if __EMX__ /* bird hacking */
++#if defined(__EMX__) || defined(EMX) /* bird hacking */
+   cp_dump_attributes (di, t);
+ #endif
+ 
+diff --git a/gcc/genattrtab.c b/gcc/genattrtab.c
+index 0829e76b7..c473a9bcf 100644
+--- a/gcc/genattrtab.c
++++ b/gcc/genattrtab.c
+@@ -5246,7 +5246,7 @@ main (int argc, const char **argv)
+   struct insn_def *id;
+   int i;
+ 
+-#ifdef EMX
++#ifdef __EMX__
+   /* Otherwise we can't use more than 32Mb memory and genattrtab uses a lot */
+   _uflags (_UF_SBRK_MODEL, _UF_SBRK_ARBITRARY);
+ #endif
+diff --git a/gcc/reg-stack.c b/gcc/reg-stack.c
+index 0c9695d1b..713329f64 100644
+--- a/gcc/reg-stack.c
++++ b/gcc/reg-stack.c
+@@ -2742,7 +2742,7 @@ convert_regs_entry (void)
+   /* GCC-OS2: fp regs passing
+      Figure out the arguments passed in stack registers.  */
+   tree parm = DECL_ARGUMENTS (current_function_decl);
+-  int incoming_arg [REG_STACK_SIZE];
++  rtx incoming_arg [REG_STACK_SIZE];
+   int i;
+ 
+   memset (incoming_arg, 0, sizeof (incoming_arg));
+@@ -2750,7 +2750,7 @@ convert_regs_entry (void)
+     {
+       rtx x = DECL_INCOMING_RTL (parm);
+       if (STACK_REG_P (x))
+-	incoming_arg[REGNO (x) - FIRST_STACK_REG] = (int) x;
++	incoming_arg[REGNO (x) - FIRST_STACK_REG] = x;
+       parm = TREE_CHAIN (parm);
+     }
+ 
+diff --git a/libstdc++-v3/crossconfig.m4 b/libstdc++-v3/crossconfig.m4
+index 344eec09d..a985975e5 100644
+--- a/libstdc++-v3/crossconfig.m4
++++ b/libstdc++-v3/crossconfig.m4
+@@ -228,6 +228,12 @@ case "${host}" in
+     AC_CHECK_FUNCS(timespec_get)
+     AC_CHECK_FUNCS(sockatmark)
+     ;;
++  *-os2*)
++    GLIBCXX_CHECK_LINKER_FEATURES
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    ;;
+   *-qnx6.1* | *-qnx6.2*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+     AC_SUBST(SECTION_FLAGS) 
+-- 
+2.28.0
+
