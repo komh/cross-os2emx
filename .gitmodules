@@ -1,0 +1,4 @@
+[submodule "binutils-os2"]
+	path = binutils-os2
+	url = https://github.com/bitwiseworks/binutils-os2.git
+	branch = master
