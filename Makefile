@@ -1,5 +1,12 @@
 # Makefile to build os2emx-cross-toolchain
 
+PACKAGE := os2emx-cross-toolchain
+VERSION := b1
+
+TAR := tar
+TARFLAGS := cvzf
+TARBALL := $(PACKAGE)-$(VERSION).tar.gz
+
 # Directory where os2emx-cross-toolchain will be installed.
 # That is, $PREFIXROOT/opt/os2emx.
 PREFIXROOT := $(HOME)
@@ -23,6 +30,8 @@ UNZIP := unzip -u
 WGET := wget
 CP := cp
 LN_S := ln -s
+MV := mv
+SED := sed
 
 BINUTILSDIR := binutils-os2
 LIBCDIR := libc
@@ -39,7 +48,8 @@ BUILDDIR := build
 .PHONY: all all-binutils all-libc all-emxtools all-gcc \
         install install-binutils install-libc install-emxtools install-extras \
 		install-gcc \
-		clean clean-binutils clean-libc clean-emxtools clean-gcc
+		clean clean-binutils clean-libc clean-emxtools clean-gcc \
+		dist
 
 all: all-binutils all-libc all-emxtools all-gcc
 
@@ -122,7 +132,27 @@ install-gcc: all-gcc
 	  $(LN_S) -f libgcc.a \
 	        $(DESTDIR)$(LIBDIR)/gcc/$(TARGETSPEC)/$$v/libgcc_so_d.a
 
+dist:
+	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
+	prefixroot=$(patsubst %/,%,$(PREFIXROOT)); \
+	test -z "$$prefixroot" || \
+	  prefixrootfirst=/$$(echo $$prefixroot | cut -d '/' -f 2); \
+	prefix=$(PREFIX); \
+	test -z "$$prefixroot" || \
+	  prefix=$$(echo $$prefix | sed -e "s,$$prefixroot,,"); \
+	prefixfirst=/$$(echo $$prefix | cut -d '/' -f 2); \
+	$(MAKE) install DESTDIR=$$destdir PREFIXROOT=$(PREFIXROOT) && \
+	$(MV) $$destdir$$prefixroot/$$prefixfirst $$destdir$$prefixfirst && \
+	$(SED) -e "s/@VER@/$(VERSION)/g" $(PACKAGE).txt \
+	 > $$destdir/$(PACKAGE)-$(VERSION).txt && \
+	$(CP) README.md $$destdir && \
+	{ test -z "$$prefixrootfirst" || $(RM) -r $$destdir$$prefixrootfirst; }; \
+	$(RM) $(TARBALL); \
+	$(TAR) $(TARFLAGS) $(TARBALL) $(PACKAGE)-$(VERSION); \
+	$(RM) -r $(PACKAGE)-$(VERSION)
+
 clean: clean-binutils clean-libc clean-emxtools clean-gcc
+	$(RM) $(TARBALL)
 
 clean-binutils:
 	$(RM) -r $(BINUTILSDIR)/$(BUILDDIR)

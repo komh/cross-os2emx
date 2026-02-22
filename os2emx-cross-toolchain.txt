@@ -1,0 +1,28 @@
+                          Upload Information Template for Hobbes.nmsu.edu
+                          ===============================================
+
+        Archive Filename: os2emx-cross-toolchain-@VER@.tar.gz
+       Short Description: os2emx-cross-toolchain @VER@
+        Long Description: os2emx-cross-tollchain @VER@.
+Cross compilation toolchain for i686-pc-os2-emx target on x86_64 Linux.
+
+      Proposed directory
+           for placement: /pub/os2/dev/tools/toolkits
+
+               Your name: KO Myung-Hun
+           Email address: komh78@gmail.com
+    Program contact name: (same)
+   Program contact email: (same)
+             Program URL: https://github.com/komh/cross-os2emx
+
+      Would you like the
+   contact email address
+    included in listings? no
+
+Operating System/Version: x86_64 Linux
+ Additional requirements:
+
+                Replaces: (none)
+
+
+
