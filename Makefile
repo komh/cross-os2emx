@@ -1,13 +1,13 @@
-# Makefile to build os2emx-cross-toolchain
+# Makefile to build cross-os2emx
 
-PACKAGE := os2emx-cross-toolchain
+PACKAGE := cross-os2emx
 VERSION := b1
 
 TAR := tar
 TARFLAGS := cvzf
 TARBALL := $(PACKAGE)-$(VERSION).tar.gz
 
-# Directory where os2emx-cross-toolchain will be installed.
+# Directory where cross-os2emx will be installed.
 # That is, $PREFIXROOT/opt/os2emx.
 PREFIXROOT := $(HOME)
 PREFIX := $(patsubst %/,%,$(PREFIXROOT))/opt/os2emx

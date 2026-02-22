@@ -1,9 +1,9 @@
                           Upload Information Template for Hobbes.nmsu.edu
                           ===============================================
 
-        Archive Filename: os2emx-cross-toolchain-@VER@.tar.gz
-       Short Description: os2emx-cross-toolchain @VER@
-        Long Description: os2emx-cross-tollchain @VER@.
+        Archive Filename: cross-os2emx-@VER@.zip
+       Short Description: cross-os2emx @VER@
+        Long Description: cross-os2emx @VER@.
 Cross compilation toolchain for i686-pc-os2-emx target on x86_64 Linux.
 
       Proposed directory
