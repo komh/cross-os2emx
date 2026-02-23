@@ -58,7 +58,7 @@ all-binutils:
 	cd $(BINUTILSDIR); \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
-	test "$(FORCE_CONFIGURE)" == "" -a -f config.status || \
+	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
 	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
 	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR)
 
@@ -77,7 +77,7 @@ all-gcc: install-binutils install-libc install-emxtools
 	cd $(GCCDIR); \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
-	test "$(FORCE_CONFIGURE)" == "" -a -f config.status || \
+	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
 	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) all-gcc all-target-libgcc
 	# Hack for libdstdc++-v3.
