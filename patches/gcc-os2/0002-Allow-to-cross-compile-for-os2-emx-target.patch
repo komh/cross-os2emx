@@ -1,11 +1,12 @@
-From 4ed1f2dc6120616032f7cc4ffe493c3888f8eee4 Mon Sep 17 00:00:00 2001
+From 3ef55263bb705d3975e9cd9af2dfcccabf6616ee Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 18:55:01 +0900
-Subject: [PATCH 2/2] Allow to cross-compile for *-os2-emx target
+Subject: [PATCH 2/3] Allow to cross-compile for *-os2-emx target
 
 ---
  gcc/Makefile.in               |  2 +-
  gcc/config/i386/emx-driver.c  |  2 ++
+ gcc/config/i386/emx.c         |  4 ++--
  gcc/config/i386/emx.h         | 10 ++++++++++
  gcc/config/i386/i386.c        | 12 ++++++------
  gcc/config/i386/i386.h        |  2 +-
@@ -13,9 +14,10 @@ Subject: [PATCH 2/2] Allow to cross-compile for *-os2-emx target
  gcc/config/i386/t-emx         |  2 +-
  gcc/cp/dump.c                 |  6 +++---
  gcc/genattrtab.c              |  2 +-
+ gcc/gengtype.c                |  4 ++--
  gcc/reg-stack.c               |  4 ++--
  libstdc++-v3/crossconfig.m4   |  6 ++++++
- 11 files changed, 34 insertions(+), 16 deletions(-)
+ 13 files changed, 38 insertions(+), 20 deletions(-)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
 index 945d92881..8414f6260 100644
@@ -49,6 +51,21 @@ index 4299c7e61..391148e6e 100644
  
    for (i = 1; i < *decoded_options_count; i++)
      {
+diff --git a/gcc/config/i386/emx.c b/gcc/config/i386/emx.c
+index 37501dc1d..93c938d09 100644
+--- a/gcc/config/i386/emx.c
++++ b/gcc/config/i386/emx.c
+@@ -633,8 +633,8 @@ i386_emx_asm_output_aligned_decl_common (FILE *stream, tree decl,
+       fprintf ((stream), "\t.comm\t");
+       assemble_name ((stream), (name));
+       fprintf ((stream), ", %lld\t# %lld\n",
+-	       (((size) + xalign - 1) / xalign) * xalign,
+-               (size));
++	       (long long)(((size) + xalign - 1) / xalign) * xalign,
++               (long long)(size));
+   }
+ }
+ 
 diff --git a/gcc/config/i386/emx.h b/gcc/config/i386/emx.h
 index 1409bb6f1..93b0343e7 100644
 --- a/gcc/config/i386/emx.h
@@ -229,6 +246,28 @@ index 0829e76b7..c473a9bcf 100644
    /* Otherwise we can't use more than 32Mb memory and genattrtab uses a lot */
    _uflags (_UF_SBRK_MODEL, _UF_SBRK_ARBITRARY);
  #endif
+diff --git a/gcc/gengtype.c b/gcc/gengtype.c
+index 6fbbf8859..eb6757db2 100644
+--- a/gcc/gengtype.c
++++ b/gcc/gengtype.c
+@@ -285,7 +285,7 @@ read_input_line (FILE *list, char **herep, char **linep, struct fileloc *pos)
+       /* No space for a lang_bitmap is necessary.  Discard the '['. */
+       c = getc (list);
+       line = here;
+-#ifndef __EMX__
++#if !defined(__EMX__) && !defined(EMX)
+       while (c != ']' && c != '\n' && c != EOF)
+ #else
+       while (c != ']' && c != '\n' && c != EOF && c != '\r')
+@@ -299,7 +299,7 @@ read_input_line (FILE *list, char **herep, char **linep, struct fileloc *pos)
+       if (c == ']')
+ 	{
+ 	  c = getc (list);	/* eat what should be a newline */
+-#ifndef __EMX__
++#if !defined(__EMX__) && !defined(EMX)
+ 	  if (c != '\n' && c != EOF)
+ #else
+ 	  if (c != '\n' && c != EOF && c != '\r' )
 diff --git a/gcc/reg-stack.c b/gcc/reg-stack.c
 index 0c9695d1b..713329f64 100644
 --- a/gcc/reg-stack.c
