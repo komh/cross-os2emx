@@ -1,0 +1,16 @@
+[binaries]
+c = '@TARGETSPEC@-gcc'
+cpp = '@TARGETSPEC@-g++'
+ar = '@TARGETSPEC@-ar'
+windres = '@TARGETSPEC@-windres'
+strip = '@TARGETSPEC@-strip'
+
+[host_machine]
+system = 'os/2'
+cpu_family = 'x86'
+cpu = '@TARGETCPU@'
+endian = 'little'
+
+[properties]
+sys_root = '@PREFIX@'
+pkg_config_libdir = '@PREFIX@/@TARGETSPEC@/lib/pkgconfig'

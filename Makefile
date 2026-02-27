@@ -13,8 +13,10 @@ PREFIXROOT := $(HOME)
 PREFIX := $(patsubst %/,%,$(PREFIXROOT))/opt/os2emx
 BINDIR := $(PREFIX)/bin
 LIBDIR := $(PREFIX)/lib
+SHAREDIR := $(PREFIX)/share
 
 TARGETSPEC := i686-pc-os2-emx
+TARGETCPU := $(firstword $(subst -, ,$(TARGETSPEC)))
 TARGETPREFIX := $(PREFIX)/$(TARGETSPEC)
 TARGETBINDIR := $(TARGETPREFIX)/bin
 TARGETINCDIR := $(TARGETPREFIX)/include
@@ -38,6 +40,7 @@ LIBCDIR := libc
 GCCDIR := gcc-os2
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
+MESONDIR := meson
 
 LIBCZIP := libc-0_1_14-1_oc00.zip
 LIBCZIPURL := https://rpm.netlabs.org/release/00/zip/$(LIBCZIP)
@@ -45,13 +48,13 @@ LIBCZIPDIR := libc-$(TARGETSPEC)
 
 BUILDDIR := build
 
-.PHONY: all all-binutils all-libc all-emxtools all-gcc \
+.PHONY: all all-binutils all-libc all-emxtools all-gcc all-meson \
         install install-binutils install-libc install-emxtools install-extras \
-		install-gcc \
-		clean clean-binutils clean-libc clean-emxtools clean-gcc \
+		install-gcc install-meson \
+		clean clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
 		dist
 
-all: all-binutils all-libc all-emxtools all-gcc
+all: all-binutils all-libc all-emxtools all-gcc all-meson
 
 all-binutils:
 	$(MKDIR_P) $(BINUTILSDIR)/$(BUILDDIR)
@@ -86,8 +89,14 @@ all-gcc: install-binutils install-libc install-emxtools
 	  $(LN_S) libgcc.a $(GCCDIR)/$(BUILDDIR)/gcc/libgcc_so_d.a
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) all-target-libstdc++-v3
 
+all-meson: $(MESONDIR)/$(TARGETSPEC).txt
+
+$(MESONDIR)/$(TARGETSPEC).txt: $(MESONDIR)/$(TARGETSPEC).txt.in
+	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
+	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
+
 install: install-binutils install-libc install-emxtools install-extras \
-         install-gcc
+         install-gcc install-meson
 
 install-binutils: all-binutils
 	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
@@ -132,6 +141,10 @@ install-gcc: all-gcc
 	  $(LN_S) -f libgcc.a \
 	        $(DESTDIR)$(LIBDIR)/gcc/$(TARGETSPEC)/$$v/libgcc_so_d.a
 
+install-meson: all-meson
+	$(INSTALL) -m 644 -D $(MESONDIR)/$(TARGETSPEC).txt \
+	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(TARGETSPEC).txt
+
 dist:
 	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
 	prefixroot=$(patsubst %/,%,$(PREFIXROOT)); \
@@ -151,7 +164,7 @@ dist:
 	$(TAR) $(TARFLAGS) $(TARBALL) $(PACKAGE)-$(VERSION); \
 	$(RM) -r $(PACKAGE)-$(VERSION)
 
-clean: clean-binutils clean-libc clean-emxtools clean-gcc
+clean: clean-binutils clean-libc clean-emxtools clean-gcc clean-meson
 	$(RM) $(TARBALL)
 
 clean-binutils:
@@ -165,3 +178,6 @@ clean-emxtools:
 
 clean-gcc:
 	$(RM) -r $(GCCDIR)/$(BUILDDIR)
+
+clean-meson:
+	$(RM) $(MESONDIR)/$(TARGETSPEC).txt

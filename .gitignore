@@ -1,2 +1,3 @@
 *.tar.gz
 libc-i686-pc-os2-emx
+meson/*.txt
