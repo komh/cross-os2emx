@@ -1,0 +1,98 @@
+From 5bf464cd53297a8272d04e3ab517cb9ed4897954 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sun, 1 Mar 2026 01:58:29 +0900
+Subject: [PATCH 4/5] Build DLLs for libgcc and libstdc++-v3
+
+---
+ conf-os2emx-cross            |  2 +-
+ config/lthostflags.m4        |  3 +++
+ libgcc/config/i386/t-emx     | 10 +++++-----
+ libstdc++-v3/configure.host  |  1 +
+ libstdc++-v3/src/Makefile.am |  2 +-
+ 5 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/conf-os2emx-cross b/conf-os2emx-cross
+index aa4b32e83..1d62c46de 100755
+--- a/conf-os2emx-cross
++++ b/conf-os2emx-cross
+@@ -16,6 +16,7 @@ opts="
+     --with-gnu-as
+     --with-as=$prefix/bin/$target-as
+     --with-ld=$prefix/bin/$target-ld
++    --enable-shared
+     --enable-languages=c,c++
+     --enable-threads
+     --enable-checking=release
+@@ -25,7 +26,6 @@ opts="
+     --disable-libquadmath
+     --disable-multilib
+     --disable-lto
+-    --disable-shared
+     --disable-symvers
+ "
+ 
+diff --git a/config/lthostflags.m4 b/config/lthostflags.m4
+index bc0f59ee7..ec3157e5d 100644
+--- a/config/lthostflags.m4
++++ b/config/lthostflags.m4
+@@ -24,6 +24,9 @@ case $host in
+       lt_host_flags='-no-undefined -bindir "$(bindir)"';
+     fi
+     ;;
++  *-os2*)
++    lt_host_flags='-no-undefined'
++    ;;
+   *)
+     lt_host_flags=[$1]
+     ;;
+diff --git a/libgcc/config/i386/t-emx b/libgcc/config/i386/t-emx
+index 4fb023611..bb419f3a3 100644
+--- a/libgcc/config/i386/t-emx
++++ b/libgcc/config/i386/t-emx
+@@ -20,13 +20,13 @@ SHLIB_BASENAME  = gcc$(SHLIB_SOVERSION)
+ SHLIB_MULTINAME = $(SHLIB_BASENAME)
+ SHLIB_DLLNAME   = $(SHLIB_MULTINAME).dll
+ SHLIB_LINK      = cp @shlib_map_file@ @shlib_map_file@.def && \
+-	gcc -g -Zhigh-mem -Zomf -Zmap -Zdll -o $(SHLIB_DLLNAME) \
+-	@shlib_map_file@.def @shlib_objs@ \
+-	-lc_alias -lc_dll  \
+-	&& ar rs $(SHLIB_BASENAME).a __main.o emx-ctordtor.o emx-eh.o \
++	$(AR) rs $(SHLIB_BASENAME).a __main.o emx-ctordtor.o emx-eh.o \
+         && emximp -o libgcc_so_d.a @shlib_map_file@.def \
+-	&& ar rs libgcc_so_d.a __main.o emx-ctordtor.o emx-eh.o \
++	&& $(AR) rs libgcc_so_d.a __main.o emx-ctordtor.o emx-eh.o \
+         && emxomf -o libgcc_so_d.lib libgcc_so_d.a \
++	&& $(CC) -g -Zhigh-mem -Zomf -Zmap -Zdll -o $(SHLIB_DLLNAME) \
++	@shlib_map_file@.def @shlib_objs@ \
++	-lc_alias -lc_dll \
+         && touch $@
+ SHLIB_SUBDIR    = .
+ SHLIB_INSTALL   = $(INSTALL_DATA) $(SHLIB_SUBDIR)/$(SHLIB_DLLNAME) $(DESTDIR)$(slibdir)/ \
+diff --git a/libstdc++-v3/configure.host b/libstdc++-v3/configure.host
+index 24205eb5f..79348fdfd 100644
+--- a/libstdc++-v3/configure.host
++++ b/libstdc++-v3/configure.host
+@@ -297,6 +297,7 @@ case "${host_os}" in
+     ;;
+   os2*)
+     os_include_dir="os/os2"
++    OPT_LDFLAGS="${OPT_LDFLAGS} \$(lt_host_flags)"
+     ;;
+   qnx6.[12]*)
+     os_include_dir="os/qnx/qnx6.1"
+diff --git a/libstdc++-v3/src/Makefile.am b/libstdc++-v3/src/Makefile.am
+index 2ebf056c4..b4dc9732a 100644
+--- a/libstdc++-v3/src/Makefile.am
++++ b/libstdc++-v3/src/Makefile.am
+@@ -34,7 +34,7 @@ SUBDIRS = c++98 c++11 c++17 $(filesystem_dir)
+ if OS_OS2
+ ## Force the DLL to be stdcppX.DLL instead of stdc++.dll for backward
+ ## compatibility and to avoid dangerous symbols in the file name.
+-short_name = -shortname stdcpp
++short_name = -os2dllname stdcpp
+ endif
+ 
+ # Cross compiler support.
+-- 
+2.28.0
+

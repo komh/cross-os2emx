@@ -75,19 +75,16 @@ $(LIBCZIPDIR)/$(LIBCZIP):
 all-emxtools: all-binutils
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross
 
-all-gcc: install-binutils install-libc install-emxtools
+all-gcc: install-binutils install-libc install-emxtools install-extras
 	$(MKDIR_P) $(GCCDIR)/$(BUILDDIR)
 	cd $(GCCDIR); \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
 	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
-	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) all-gcc all-target-libgcc
-	# Hack for libdstdc++-v3.
-	# This may be removed if building a shared libgcc.
-	test -f $(GCCDIR)/$(BUILDDIR)/gcc/libgcc_so_d.a || \
-	  $(LN_S) libgcc.a $(GCCDIR)/$(BUILDDIR)/gcc/libgcc_so_d.a
-	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) all-target-libstdc++-v3
+	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
+	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) \
+	  all-gcc all-target-libgcc all-target-libstdc++-v3
 
 all-meson: $(MESONDIR)/$(TARGETSPEC).txt
 
@@ -133,13 +130,6 @@ install-extras:
 install-gcc: all-gcc
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) DESTDIR=$(DESTDIR) \
 	           install-gcc install-target-libgcc install-target-libstdc++-v3
-	# Hack for libgcc_eh.a and libgcc_so_d.a.
-	# This may be removed if building a shared libgcc.
-	v=$$($(SED) -e 's/^\([0-9]*\).*/\1/' $(GCCDIR)/gcc/BASE-VER) && \
-	  $(AR) $(ARFLAGS) \
-	        $(DESTDIR)$(LIBDIR)/gcc/$(TARGETSPEC)/$$v/libgcc_eh.a && \
-	  $(LN_S) -f libgcc.a \
-	        $(DESTDIR)$(LIBDIR)/gcc/$(TARGETSPEC)/$$v/libgcc_so_d.a
 
 install-meson: all-meson
 	$(INSTALL) -m 644 -D $(MESONDIR)/$(TARGETSPEC).txt \
