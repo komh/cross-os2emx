@@ -135,7 +135,7 @@ install-gcc: all-gcc
 	           install-gcc install-target-libgcc install-target-libstdc++-v3
 	# Hack for libgcc_eh.a and libgcc_so_d.a.
 	# This may be removed if building a shared libgcc.
-	v=$$(sed -e 's/^\([0-9]*\).*/\1/' $(GCCDIR)/gcc/BASE-VER) && \
+	v=$$($(SED) -e 's/^\([0-9]*\).*/\1/' $(GCCDIR)/gcc/BASE-VER) && \
 	  $(AR) $(ARFLAGS) \
 	        $(DESTDIR)$(LIBDIR)/gcc/$(TARGETSPEC)/$$v/libgcc_eh.a && \
 	  $(LN_S) -f libgcc.a \
@@ -152,7 +152,7 @@ dist:
 	  prefixrootfirst=/$$(echo $$prefixroot | cut -d '/' -f 2); \
 	prefix=$(PREFIX); \
 	test -z "$$prefixroot" || \
-	  prefix=$$(echo $$prefix | sed -e "s,$$prefixroot,,"); \
+	  prefix=$$(echo $$prefix | $(SED) -e "s,$$prefixroot,,"); \
 	prefixfirst=/$$(echo $$prefix | cut -d '/' -f 2); \
 	$(MAKE) install DESTDIR=$$destdir PREFIXROOT=$(PREFIXROOT) && \
 	$(MV) $$destdir$$prefixroot/$$prefixfirst $$destdir$$prefixfirst && \
