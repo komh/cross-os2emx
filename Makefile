@@ -78,6 +78,7 @@ all-emxtools: all-binutils
 all-gcc: install-binutils install-libc install-emxtools install-extras
 	$(MKDIR_P) $(GCCDIR)/$(BUILDDIR)
 	cd $(GCCDIR); \
+	contrib/download_prerequisites || exit 1; \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
