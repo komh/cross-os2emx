@@ -1,0 +1,35 @@
+From e7044cc608536a3997a4be83ef1af6bcf37f0ffa Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sun, 1 Mar 2026 18:34:46 +0900
+Subject: [PATCH 5/5] Build libssp
+
+---
+ conf-os2emx-cross | 1 -
+ mk-os2emx-cross   | 2 ++
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/conf-os2emx-cross b/conf-os2emx-cross
+index 1d62c46de..77b1ddd1a 100755
+--- a/conf-os2emx-cross
++++ b/conf-os2emx-cross
+@@ -22,7 +22,6 @@ opts="
+     --enable-checking=release
+     --disable-bootstrap
+     --disable-nls
+-    --disable-ssp
+     --disable-libquadmath
+     --disable-multilib
+     --disable-lto
+diff --git a/mk-os2emx-cross b/mk-os2emx-cross
+index 567461cab..74d0a8d3e 100755
+--- a/mk-os2emx-cross
++++ b/mk-os2emx-cross
+@@ -6,3 +6,5 @@ make all-target-libgcc &&
+ make install-target-libgcc &&
+ make all-target-libstdc++-v3 &&
+ make install-target-libstdc++-v3
++make all-target-libssp &&
++make install-target-libssp
+-- 
+2.28.0
+

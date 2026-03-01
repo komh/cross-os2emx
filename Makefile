@@ -84,7 +84,7 @@ all-gcc: install-binutils install-libc install-emxtools install-extras
 	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
 	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) \
-	  all-gcc all-target-libgcc all-target-libstdc++-v3
+	  all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp
 
 all-meson: $(MESONDIR)/$(TARGETSPEC).txt
 
@@ -129,7 +129,8 @@ install-extras:
 
 install-gcc: all-gcc
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) DESTDIR=$(DESTDIR) \
-	           install-gcc install-target-libgcc install-target-libstdc++-v3
+	           install-gcc install-target-libgcc install-target-libstdc++-v3 \
+	           install-target-libssp
 
 install-meson: all-meson
 	$(INSTALL) -m 644 -D $(MESONDIR)/$(TARGETSPEC).txt \
