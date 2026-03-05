@@ -1,0 +1,300 @@
+From 5f6c2319f185f03dddd71d8a68de2dd6c277a85c Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Thu, 5 Mar 2026 20:39:39 +0900
+Subject: [PATCH 2/3] allow OS/2-specific behavior on non-OS/2 platforms
+
+---
+ Source/cmGeneratorTarget.cxx                  | 49 +++++++------
+ Source/cmInstallCommand.cxx                   | 71 ++++++++++---------
+ .../cmMakefileExecutableTargetGenerator.cxx   |  2 -
+ Source/cmMakefileLibraryTargetGenerator.cxx   |  2 -
+ Source/cmNinjaNormalTargetGenerator.cxx       |  2 -
+ Source/cmRulePlaceholderExpander.cxx          |  4 --
+ Source/cmRulePlaceholderExpander.h            |  2 -
+ 7 files changed, 60 insertions(+), 72 deletions(-)
+
+diff --git a/Source/cmGeneratorTarget.cxx b/Source/cmGeneratorTarget.cxx
+index d5ae8974..4155a92a 100644
+--- a/Source/cmGeneratorTarget.cxx
++++ b/Source/cmGeneratorTarget.cxx
+@@ -260,13 +260,13 @@ const char* cmGeneratorTarget::GetOutputTargetType(
+       if (this->IsDLLPlatform()) {
+         switch (artifact) {
+           case cmStateEnums::RuntimeBinaryArtifact:
+-#ifdef __OS2__
+-            // A DLL shared library is treated as a library target.
+-            return "LIBRARY";
+-#else
++            if (this->Makefile->IsOn("OS2")) {
++              // A DLL shared library is treated as a library target.
++              return "LIBRARY";
++            }
++
+             // A DLL shared library is treated as a runtime target.
+             return "RUNTIME";
+-#endif
+           case cmStateEnums::ImportLibraryArtifact:
+             // A DLL import library is treated as an archive target.
+             return "ARCHIVE";
+@@ -345,12 +345,12 @@ std::string cmGeneratorTarget::GetOutputName(
+       props.push_back(configUpper + "_OUTPUT_NAME");
+     }
+ 
+-#ifdef __OS2__
+-    // short name for os/2 to overcome the 8.3 dll name scheme
+-    // not needed for importlibs
+-    if (artifact != cmStateEnums::ImportLibraryArtifact)
+-      props.push_back("TARGET_SHORT");
+-#endif
++    if (this->Makefile->IsOn("OS2")) {
++      // short name for os/2 to overcome the 8.3 dll name scheme
++      // not needed for importlibs
++      if (artifact != cmStateEnums::ImportLibraryArtifact)
++        props.push_back("TARGET_SHORT");
++    }
+ 
+     // OUTPUT_NAME
+     props.emplace_back("OUTPUT_NAME");
+@@ -3683,12 +3683,11 @@ cmGeneratorTarget::GetFullNameInternalComponents(
+     outBase += configPostfix;
+   }
+ 
+-#ifdef __OS2__
+-  if ((this->GetType() == cmStateEnums::SHARED_LIBRARY ||
++  if (this->Makefile->IsOn("OS2") &&
++      (this->GetType() == cmStateEnums::SHARED_LIBRARY ||
+       this->GetType() == cmStateEnums::MODULE_LIBRARY) &&
+       !isImportedLibraryArtifact && outBase.length() > 8)
+     outBase.erase(8);
+-#endif
+ 
+   // Name shared libraries with their version number on some platforms.
+   if (cmValue soversion = this->GetProperty("SOVERSION")) {
+@@ -3701,17 +3700,17 @@ cmGeneratorTarget::GetFullNameInternalComponents(
+         (dllProp.IsOn() ||
+          (!dllProp.IsSet() &&
+           this->Makefile->IsOn("CMAKE_SHARED_LIBRARY_NAME_WITH_VERSION")))) {
+-#ifndef __OS2__
+-      outBase += "-";
+-#else
+-      std::string soversionString;
+-      soversionString += *soversion;
+-      cmSystemTools::ReplaceString(soversionString, ".", "");
+-      soversion = (cmValue) &soversionString;
+-      int len = soversionString.length();
+-      if(outBase.length() + len > 8)
+-        outBase.erase(8 - len);
+-#endif
++      if (!this->Makefile->IsOn("OS2")) {
++        outBase += "-";
++      } else {
++        std::string soversionString;
++        soversionString += *soversion;
++        cmSystemTools::ReplaceString(soversionString, ".", "");
++        soversion = (cmValue) &soversionString;
++        int len = soversionString.length();
++        if(outBase.length() + len > 8)
++          outBase.erase(8 - len);
++      }
+       outBase += *soversion;
+     }
+   }
+diff --git a/Source/cmInstallCommand.cxx b/Source/cmInstallCommand.cxx
+index 03c987ed..53cfb769 100644
+--- a/Source/cmInstallCommand.cxx
++++ b/Source/cmInstallCommand.cxx
+@@ -843,41 +843,42 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
+               target, archiveArgs, true, helper.Makefile->GetBacktrace());
+             artifactsSpecified = true;
+           }
+-#ifdef __OS2__
+-          if (!libraryArgs.GetDestination().empty()) {
+-            // The DLL uses the LIBRARY properties.
+-            libraryGenerator = CreateInstallTargetGenerator(
+-              target, libraryArgs, false, helper.Makefile->GetBacktrace());
+-            artifactsSpecified = true;
+-          }
+-#else
+-          if (!runtimeArgs.GetDestination().empty()) {
+-            // The DLL uses the RUNTIME properties.
+-            runtimeGenerator = CreateInstallTargetGenerator(
+-              target, runtimeArgs, false, helper.Makefile->GetBacktrace());
+-            artifactsSpecified = true;
+-          }
+-#endif
+-#ifdef __OS2__
+-          if (!archiveGenerator && !libraryGenerator) {
+-#else
+-          if (!archiveGenerator && !runtimeGenerator) {
+-#endif
+-            archiveGenerator = CreateInstallTargetGenerator(
+-              target, archiveArgs, true, helper.Makefile->GetBacktrace(),
+-              helper.GetArchiveDestination(nullptr));
+-#ifdef __OS2__
+-            libraryGenerator = CreateInstallTargetGenerator(
+-              target, libraryArgs, false, helper.Makefile->GetBacktrace(),
+-              helper.GetLibraryDestination(nullptr));
+-#else
+-            runtimeGenerator = CreateInstallTargetGenerator(
+-              target, runtimeArgs, false, helper.Makefile->GetBacktrace(),
+-              helper.GetRuntimeDestination(nullptr));
+-#endif
+-          }
+-          if (runtimeDependencySet && runtimeGenerator) {
+-            runtimeDependencySet->AddLibrary(runtimeGenerator.get());
++          if (helper.Makefile->IsOn("OS2")) {
++            if (!libraryArgs.GetDestination().empty()) {
++              // The DLL uses the LIBRARY properties.
++              libraryGenerator = CreateInstallTargetGenerator(
++                target, libraryArgs, false, helper.Makefile->GetBacktrace());
++              artifactsSpecified = true;
++            }
++            if (!archiveGenerator && !libraryGenerator) {
++              archiveGenerator = CreateInstallTargetGenerator(
++                target, archiveArgs, true, helper.Makefile->GetBacktrace(),
++                helper.GetArchiveDestination(nullptr));
++              libraryGenerator = CreateInstallTargetGenerator(
++                target, libraryArgs, false, helper.Makefile->GetBacktrace(),
++                helper.GetLibraryDestination(nullptr));
++            }
++            if (runtimeDependencySet && libraryGenerator) {
++              runtimeDependencySet->AddLibrary(libraryGenerator.get());
++            }
++          } else {
++            if (!runtimeArgs.GetDestination().empty()) {
++              // The DLL uses the RUNTIME properties.
++              runtimeGenerator = CreateInstallTargetGenerator(
++                target, runtimeArgs, false, helper.Makefile->GetBacktrace());
++              artifactsSpecified = true;
++            }
++            if (!archiveGenerator && !runtimeGenerator) {
++              archiveGenerator = CreateInstallTargetGenerator(
++                target, archiveArgs, true, helper.Makefile->GetBacktrace(),
++                helper.GetArchiveDestination(nullptr));
++              runtimeGenerator = CreateInstallTargetGenerator(
++                target, runtimeArgs, false, helper.Makefile->GetBacktrace(),
++                helper.GetRuntimeDestination(nullptr));
++            }
++            if (runtimeDependencySet && runtimeGenerator) {
++              runtimeDependencySet->AddLibrary(runtimeGenerator.get());
++            }
+           }
+         } else {
+           // This is a non-DLL platform.
+diff --git a/Source/cmMakefileExecutableTargetGenerator.cxx b/Source/cmMakefileExecutableTargetGenerator.cxx
+index dffee627..a6c000f9 100644
+--- a/Source/cmMakefileExecutableTargetGenerator.cxx
++++ b/Source/cmMakefileExecutableTargetGenerator.cxx
+@@ -571,14 +571,12 @@ void cmMakefileExecutableTargetGenerator::WriteExecutableRule(bool relink)
+     vars.Flags = flags.c_str();
+     vars.LinkFlags = linkFlags.c_str();
+     vars.Manifests = manifests.c_str();
+-#ifdef __OS2__
+     vars.OS2DefVendor = this->GeneratorTarget->GetProperty("OS2_DEF_VENDOR").GetCStr();
+     vars.OS2DefVersion = this->GeneratorTarget->GetProperty("OS2_DEF_VERSION").GetCStr();
+     vars.OS2DefPatch = this->GeneratorTarget->GetProperty("OS2_DEF_PATCH").GetCStr();
+     vars.OS2DefExeType = this->GeneratorTarget->GetProperty("OS2_DEF_EXEType").GetCStr();
+     vars.OS2DefExeStack = this->GeneratorTarget->GetProperty("OS2_DEF_EXEStack").GetCStr();
+     vars.Version = this->GeneratorTarget->GetProperty("VERSION").GetCStr();
+-#endif
+ 
+     std::string linkerLauncher =
+       this->GetLinkerLauncher(this->GetConfigName());
+diff --git a/Source/cmMakefileLibraryTargetGenerator.cxx b/Source/cmMakefileLibraryTargetGenerator.cxx
+index a6232222..815ec751 100644
+--- a/Source/cmMakefileLibraryTargetGenerator.cxx
++++ b/Source/cmMakefileLibraryTargetGenerator.cxx
+@@ -779,14 +779,12 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules(
+     vars.Linker = linker.c_str();
+     vars.AIXExports = aixExports.c_str();
+     vars.Objects = buildObjs.c_str();
+-#ifdef __OS2__
+     vars.OS2DefVendor = this->GeneratorTarget->GetProperty("OS2_DEF_VENDOR").GetCStr();
+     vars.OS2DefVersion = this->GeneratorTarget->GetProperty("OS2_DEF_VERSION").GetCStr();
+     vars.OS2DefPatch = this->GeneratorTarget->GetProperty("OS2_DEF_PATCH").GetCStr();
+     vars.OS2DefExeType = this->GeneratorTarget->GetProperty("OS2_DEF_EXEType").GetCStr();
+     vars.OS2DefExeStack = this->GeneratorTarget->GetProperty("OS2_DEF_EXEStack").GetCStr();
+     vars.Version = this->GeneratorTarget->GetProperty("VERSION").GetCStr();
+-#endif
+     std::string objectDir = this->GeneratorTarget->GetSupportDirectory();
+ 
+     objectDir = this->LocalGenerator->ConvertToOutputFormat(
+diff --git a/Source/cmNinjaNormalTargetGenerator.cxx b/Source/cmNinjaNormalTargetGenerator.cxx
+index 518ef3c9..bdf3587c 100644
+--- a/Source/cmNinjaNormalTargetGenerator.cxx
++++ b/Source/cmNinjaNormalTargetGenerator.cxx
+@@ -543,7 +543,6 @@ void cmNinjaNormalTargetGenerator::WriteLinkRule(bool useResponseFile,
+     vars.TargetVersionMajor = targetVersionMajor.c_str();
+     vars.TargetVersionMinor = targetVersionMinor.c_str();
+ 
+-#ifdef __OS2__
+     auto const tgtNames = this->TargetNames(config);
+     vars.TargetNameOS2 = tgtNames.Base.c_str();
+     vars.OS2DefVendor = this->GeneratorTarget->GetProperty("OS2_DEF_VENDOR").GetCStr();
+@@ -552,7 +551,6 @@ void cmNinjaNormalTargetGenerator::WriteLinkRule(bool useResponseFile,
+     vars.OS2DefExeType = this->GeneratorTarget->GetProperty("OS2_DEF_EXEType").GetCStr();
+     vars.OS2DefExeStack = this->GeneratorTarget->GetProperty("OS2_DEF_EXEStack").GetCStr();
+     vars.Version = this->GeneratorTarget->GetProperty("VERSION").GetCStr();
+-#endif
+ 
+     vars.Flags = "$FLAGS";
+     vars.LinkFlags = "$LINK_FLAGS";
+diff --git a/Source/cmRulePlaceholderExpander.cxx b/Source/cmRulePlaceholderExpander.cxx
+index 78cf0809..331f80af 100644
+--- a/Source/cmRulePlaceholderExpander.cxx
++++ b/Source/cmRulePlaceholderExpander.cxx
+@@ -226,7 +226,6 @@ std::string cmRulePlaceholderExpander::ExpandVariable(
+       }
+     }
+ 
+-#ifdef __OS2__
+    // give back the name of the target without extension and any leading path
+    // this is needed to have the def files created right
+     if (this->ReplaceValues->Target) {
+@@ -255,7 +254,6 @@ std::string cmRulePlaceholderExpander::ExpandVariable(
+         return targetBase;
+       }
+     }
+-#endif
+ 
+   }
+   if (variable == "TARGET_SONAME" || variable == "SONAME_FLAG" ||
+@@ -296,7 +294,6 @@ std::string cmRulePlaceholderExpander::ExpandVariable(
+     }
+   }
+ 
+-#ifdef __OS2__
+   if (this->ReplaceValues->CMTargetName) {
+     if (variable == "OS2_DEF_VERSION") {
+ 
+@@ -346,7 +343,6 @@ std::string cmRulePlaceholderExpander::ExpandVariable(
+       }
+     }
+   }
+-#endif
+   if (this->ReplaceValues->Output) {
+     if (variable == "OUTPUT") {
+       return this->ReplaceValues->Output;
+diff --git a/Source/cmRulePlaceholderExpander.h b/Source/cmRulePlaceholderExpander.h
+index 2f6762e7..0bdbba28 100644
+--- a/Source/cmRulePlaceholderExpander.h
++++ b/Source/cmRulePlaceholderExpander.h
+@@ -62,7 +62,6 @@ public:
+     const char* DependencyFile = nullptr;
+     const char* DependencyTarget = nullptr;
+     const char* FilterPrefix = nullptr;
+-#ifdef __OS2__
+     const char* TargetNameOS2 = nullptr;
+     const char* OS2DefVendor = nullptr;
+     const char* OS2DefPatch = nullptr;
+@@ -70,7 +69,6 @@ public:
+     const char* OS2DefExeType = nullptr;
+     const char* OS2DefExeStack = nullptr;
+     const char* Version = nullptr;
+-#endif
+     const char* SwiftLibraryName = nullptr;
+     const char* SwiftModule = nullptr;
+     const char* SwiftModuleName = nullptr;
+-- 
+2.28.0
+

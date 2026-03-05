@@ -1,0 +1,37 @@
+From de81bab8643e92ca34066e526838eb7fb61d8d7b Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Thu, 5 Mar 2026 21:02:54 +0900
+Subject: [PATCH 3/3] fix SIGSEGV on generating phase of cmake due to a wrong
+ type casting
+
+---
+ Source/cmGeneratorTarget.cxx | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/Source/cmGeneratorTarget.cxx b/Source/cmGeneratorTarget.cxx
+index 4155a92a..ad42f799 100644
+--- a/Source/cmGeneratorTarget.cxx
++++ b/Source/cmGeneratorTarget.cxx
+@@ -3702,16 +3702,15 @@ cmGeneratorTarget::GetFullNameInternalComponents(
+           this->Makefile->IsOn("CMAKE_SHARED_LIBRARY_NAME_WITH_VERSION")))) {
+       if (!this->Makefile->IsOn("OS2")) {
+         outBase += "-";
++        outBase += *soversion;
+       } else {
+-        std::string soversionString;
+-        soversionString += *soversion;
++        std::string soversionString = *soversion;
+         cmSystemTools::ReplaceString(soversionString, ".", "");
+-        soversion = (cmValue) &soversionString;
+         int len = soversionString.length();
+         if(outBase.length() + len > 8)
+           outBase.erase(8 - len);
++        outBase += soversionString;
+       }
+-      outBase += *soversion;
+     }
+   }
+ 
+-- 
+2.28.0
+

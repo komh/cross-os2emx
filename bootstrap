@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for sub in binutils-os2 gcc-os2 libc ; do
+for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
   echo "Initializing submodule $sub..."
   git submodule update --init $sub || exit 1
 

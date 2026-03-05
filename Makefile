@@ -41,6 +41,7 @@ GCCDIR := gcc-os2
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 MESONDIR := meson
+CMAKEDIR := cmake-os2
 
 LIBCZIP := libc-0_1_14-1_oc00.zip
 LIBCZIPURL := https://rpm.netlabs.org/release/00/zip/$(LIBCZIP)
@@ -48,13 +49,14 @@ LIBCZIPDIR := libc-$(TARGETSPEC)
 
 BUILDDIR := build
 
-.PHONY: all all-binutils all-libc all-emxtools all-gcc all-meson \
+.PHONY: all all-binutils all-libc all-emxtools all-gcc all-meson all-cmake \
         install install-binutils install-libc install-emxtools install-extras \
-		install-gcc install-meson \
+		install-gcc install-meson install-cmake \
 		clean clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
+		clean-cmake \
 		dist
 
-all: all-binutils all-libc all-emxtools all-gcc all-meson
+all: all-binutils all-libc all-emxtools all-gcc all-meson all-cmake
 
 all-binutils:
 	$(MKDIR_P) $(BINUTILSDIR)/$(BUILDDIR)
@@ -93,8 +95,16 @@ $(MESONDIR)/$(TARGETSPEC).txt: $(MESONDIR)/$(TARGETSPEC).txt.in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
+all-cmake:
+	$(MKDIR_P) $(CMAKEDIR)/$(BUILDDIR)
+	cd $(CMAKEDIR)/$(BUILDDIR); \
+	test -f Makefile || \
+	  ../configure --prefix=$(PREFIX);
+	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
+	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR)
+
 install: install-binutils install-libc install-emxtools install-extras \
-         install-gcc install-meson
+         install-gcc install-meson install-cmake
 
 install-binutils: all-binutils
 	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
@@ -137,6 +147,9 @@ install-meson: all-meson
 	$(INSTALL) -m 644 -D $(MESONDIR)/$(TARGETSPEC).txt \
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(TARGETSPEC).txt
 
+install-cmake: all-cmake
+	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
+
 dist:
 	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
 	prefixroot=$(patsubst %/,%,$(PREFIXROOT)); \
@@ -156,7 +169,8 @@ dist:
 	$(TAR) $(TARFLAGS) $(TARBALL) $(PACKAGE)-$(VERSION); \
 	$(RM) -r $(PACKAGE)-$(VERSION)
 
-clean: clean-binutils clean-libc clean-emxtools clean-gcc clean-meson
+clean: clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
+       clean-cmake
 	$(RM) $(TARBALL)
 
 clean-binutils:
@@ -173,3 +187,6 @@ clean-gcc:
 
 clean-meson:
 	$(RM) $(MESONDIR)/$(TARGETSPEC).txt
+
+clean-cmake:
+	$(RM) -r $(CMAKEDIR)/$(BUILDDIR)
