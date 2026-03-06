@@ -9,7 +9,7 @@ set(CMAKE_C_COMPILER @PREFIX@/bin/@TARGETSPEC@-gcc)
 set(CMAKE_CXX_COMPILER @PREFIX@/bin/@TARGETSPEC@-g++)
 
 # the path to be passed to the compiler and the linker in the --sysroot flag
-set(CMAKE_SYSROOT @PREFIX@/@TARGET@)
+set(CMAKE_SYSROOT @PREFIX@/@TARGETSPEC@)
 
 # where is the target environment located
 set(CMAKE_FIND_ROOT_PATH ${CMAKE_SYSROOT})
