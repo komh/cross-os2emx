@@ -43,6 +43,7 @@ EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 CMAKEDIR := cmake-os2
 MESONCROSSFILE := meson/$(TARGETSPEC).txt
+CMAKECROSSFILE := cmake/$(TARGETSPEC).cmake
 
 LIBCZIP := libc-0_1_14-1_oc00.zip
 LIBCZIPURL := https://rpm.netlabs.org/release/00/zip/$(LIBCZIP)
@@ -96,13 +97,17 @@ $(MESONCROSSFILE): $(MESONCROSSFILE).in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
-all-cmake:
+all-cmake: $(CMAKECROSSFILE)
 	$(MKDIR_P) $(CMAKEDIR)/$(BUILDDIR)
 	cd $(CMAKEDIR)/$(BUILDDIR); \
 	test -f Makefile || \
 	  ../configure --prefix=$(PREFIX);
 	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
 	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR)
+
+$(CMAKECROSSFILE): $(CMAKECROSSFILE).in
+	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
+	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
 install: install-binutils install-libc install-emxtools install-extras \
          install-gcc install-meson install-cmake
@@ -149,6 +154,8 @@ install-meson: all-meson
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE))
 
 install-cmake: all-cmake
+	$(INSTALLDATA) -D $(CMAKECROSSFILE) \
+	  $(DESTDIR)$(SHAREDIR)/cmake/cross/$(notdir $(CMAKECROSSFILE))
 	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
 
 dist:
@@ -190,4 +197,5 @@ clean-meson:
 	$(RM) $(MESONCROSSFILE)
 
 clean-cmake:
+	$(RM) $(CMAKECROSSFILE)
 	$(RM) -r $(CMAKEDIR)/$(BUILDDIR)
