@@ -111,10 +111,10 @@ install-binutils: all-binutils
 
 install-libc: all-libc
 	$(INSTALL) -d $(DESTDIR)$(TARGETPREFIX)
-	$(CP) -pR "$(LIBCZIPDIR)/@unixroot/usr/include" \
-	          "$(DESTDIR)$(TARGETPREFIX)"
-	$(CP) -pR "$(LIBCZIPDIR)/@unixroot/usr/lib" \
-	          "$(DESTDIR)$(TARGETPREFIX)"
+	$(CP) -a "$(LIBCZIPDIR)/@unixroot/usr/include" \
+	         "$(DESTDIR)$(TARGETPREFIX)"
+	$(CP) -a "$(LIBCZIPDIR)/@unixroot/usr/lib" \
+	         "$(DESTDIR)$(TARGETPREFIX)"
 	$(INSTALL) -d $(DESTDIR)$(TARGETPREFIX)/usr
 	$(RM) $(DESTDIR)$(TARGETPREFIX)/usr/include
 	$(LN_S) ../include $(DESTDIR)$(TARGETPREFIX)/usr/include
