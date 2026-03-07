@@ -45,7 +45,7 @@ GCCDIR := gcc-os2
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 CMAKEDIR := cmake-os2
-MESONCROSSFILE := meson/$(TARGETSPEC).txt
+MESONCROSSFILE := meson/$(TARGETSPEC)
 CMAKECROSSFILE := cmake/$(TARGETSPEC).cmake
 
 LIBCZIP := libc-0_1_14-1_oc00.zip
@@ -94,9 +94,13 @@ all-gcc: install-binutils install-libc install-emxtools install-extras
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) -j $(NJOBS) \
 	  all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp
 
-all-meson: $(MESONCROSSFILE)
+all-meson: $(MESONCROSSFILE).aout.txt $(MESONCROSSFILE).omf.txt
 
-$(MESONCROSSFILE): $(MESONCROSSFILE).in
+$(MESONCROSSFILE).aout.txt: $(MESONCROSSFILE).aout.txt.in
+	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
+	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
+
+$(MESONCROSSFILE).omf.txt: $(MESONCROSSFILE).omf.txt.in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
@@ -154,8 +158,10 @@ install-gcc: all-gcc
 	           install-target-libssp
 
 install-meson: all-meson
-	$(INSTALLDATA) -D $(MESONCROSSFILE) \
-	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE))
+	$(INSTALLDATA) -D $(MESONCROSSFILE).aout.txt \
+	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE).aout.txt)
+	$(INSTALLDATA) -D $(MESONCROSSFILE).omf.txt \
+	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE).omf.txt)
 
 install-cmake: all-cmake
 	$(INSTALLDATA) -D $(CMAKECROSSFILE) \
@@ -201,7 +207,7 @@ clean-gcc:
 	$(RM) -r $(GCCDIR)/$(BUILDDIR)
 
 clean-meson:
-	$(RM) $(MESONCROSSFILE)
+	$(RM) $(MESONCROSSFILE).aout.txt $(MESONCROSSFILE).omf.txt
 
 clean-cmake:
 	$(RM) $(CMAKECROSSFILE)
