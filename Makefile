@@ -173,7 +173,7 @@ dist:
 	    $(MV) $$destdir$$prefixroot$$prefixfirst $$destdir$$prefixfirst; \
 	} && \
 	$(SED) -e "s/@VER@/$(VERSION)/g" $(PACKAGE).txt \
-	 > $$destdir/$(PACKAGE)-$(VERSION).txt && \
+	  > $$destdir/$(PACKAGE)-$(VERSION).txt && \
 	$(CP) README.md $$destdir && \
 	{ test -z "$$prefixrootfirst" || $(RM) -r $$destdir$$prefixrootfirst; }; \
 	$(RM) $(TARBALL); \
