@@ -1,0 +1,2391 @@
+From 0652b4729e427180764dcddd40a4febfc05fa22d Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sat, 14 Mar 2026 18:47:20 +0900
+Subject: [PATCH] Apply the patches for IBM HLL debug type support of v1.9 to
+ v2 fork
+
+---
+ bld/dig/h/diphndls.h       |   2 +-
+ bld/dip/codeview/c/cvsym.c |   5 +
+ bld/dip/dwarf/c/dfmod.c    |   2 +-
+ bld/dip/hllcv/c/hllmod.c   |  18 +-
+ bld/dip/hllcv/c/hllsym.c   |   7 +-
+ bld/dip/hllcv/h/hllinfo.h  |   3 +-
+ bld/exedump/c/dumphll.c    | 530 ++++++++++++++++++++++---
+ bld/watcom/h/hll.h         |  26 +-
+ bld/wl/c/cmdall.c          |  21 +
+ bld/wl/c/dbgall.c          |  42 +-
+ bld/wl/c/dbgcv.c           |   3 +-
+ bld/wl/c/dbghll.c          | 766 +++++++++++++++++++++++++++++++++++++
+ bld/wl/c/obj2supp.c        |   6 +-
+ bld/wl/c/objomf.c          | 121 +++++-
+ bld/wl/h/dbghll.h          |  49 +++
+ bld/wl/h/debug.h           |   1 +
+ bld/wl/h/link.h            |   4 +-
+ bld/wl/h/objstruc.h        |  16 +-
+ bld/wl/h/specials.h        |   1 +
+ bld/wl/h/wlbanner.h        |   2 +
+ bld/wl/res/wlink.msg       |  10 +-
+ bld/wl/wlobjs.mif          |   1 +
+ bld/wstrip/c/strip.c       |   4 +-
+ 23 files changed, 1552 insertions(+), 88 deletions(-)
+ create mode 100644 bld/wl/c/dbghll.c
+ create mode 100644 bld/wl/h/dbghll.h
+
+diff --git a/bld/dig/h/diphndls.h b/bld/dig/h/diphndls.h
+index 25d707e917..c30d92d55a 100644
+--- a/bld/dig/h/diphndls.h
++++ b/bld/dig/h/diphndls.h
+@@ -33,6 +33,6 @@
+ /*      enum    DIP manager handle size DIP's imp.handle size       Debugger imp.handle size    CV demand type          Watcom demand type
+         enum    hsize                   ihsize                      wvihsize                    cvdmndtype              wdmndtype */
+ pick( HK_IMAGE, sizeof( image_handle ), sizeof( imp_image_handle ), 0,                          0,                      0 )
+-pick( HK_TYPE,  sizeof( type_handle ),  sizeof( imp_type_handle ),  sizeof( imp_type_handle ),  0 /*sstGlobalTypes*/,   DMND_TYPES )
++pick( HK_TYPE,  sizeof( type_handle ),  sizeof( imp_type_handle ),  sizeof( imp_type_handle ),  sstGlobalTypes,   DMND_TYPES )
+ pick( HK_CUE,   sizeof( cue_handle ),   sizeof( imp_cue_handle ),   0,                          sstSrcModule,           DMND_LINES )
+ pick( HK_SYM,   sizeof( sym_handle ),   sizeof( imp_sym_handle ),   sizeof( imp_sym_handle ),   sstAlignSym,            DMND_LOCALS )
+diff --git a/bld/dip/codeview/c/cvsym.c b/bld/dip/codeview/c/cvsym.c
+index ab07f4e39d..45383dd0f5 100644
+--- a/bld/dip/codeview/c/cvsym.c
++++ b/bld/dip/codeview/c/cvsym.c
+@@ -161,6 +161,11 @@ static dip_status SymGetName( imp_image_handle *iih, imp_sym_handle *ish,
+     case S_GTHREAD32:
+         skip = sizeof( s_lthread32 );
+         break;
++    case S_ALIGN:
++        /* FIXME: figure out why we're here. */
++        *name_len_p = 0;
++        *name_p = "";
++        return( DS_OK );
+     default:
+         Confused();
+     }
+diff --git a/bld/dip/dwarf/c/dfmod.c b/bld/dip/dwarf/c/dfmod.c
+index cd72b3ce26..eeafd2e583 100644
+--- a/bld/dip/dwarf/c/dfmod.c
++++ b/bld/dip/dwarf/c/dfmod.c
+@@ -451,7 +451,7 @@ static bool AModAddr( void *_info, dr_line_data *curr )
+         iih = info->iih;
+         DCMapAddr( &info->ret->mach, iih->dcmap );
+         off = FindMapAddr( iih->addr_map, info->ret );
+-        if( off->imh == info->imh ) {
++        if( off && off->imh == info->imh ){ /* bird: why does dipdump crash here? */
+             ret = false;
+         }
+     }
+diff --git a/bld/dip/hllcv/c/hllmod.c b/bld/dip/hllcv/c/hllmod.c
+index f5c9777ed7..ff3083a043 100644
+--- a/bld/dip/hllcv/c/hllmod.c
++++ b/bld/dip/hllcv/c/hllmod.c
+@@ -146,21 +146,22 @@ size_t DIPIMPENTRY( ModName )( imp_image_handle *iih, imp_mod_handle imh,
+     return( 0 );
+ }
+ 
+-hll_ssr_cuinfo *hllGetCompInfo( imp_image_handle *iih, imp_mod_handle imh )
++hll_ssr_cu_info *hllGetCompInfo( imp_image_handle *iih, imp_mod_handle imh )
+ /**************************************************************************
+  * Gets the compiler unit infomation record (unit = module, so for a module).
+  */
+ {
++    // 2023-11-18 SHL correct hll_ssr_cu_info typo
+     hll_dir_entry *hdd = hllFindDirEntry( iih, imh, hll_sstSymbols );
+     if( hdd != NULL ) {
+         virt_mem        pos = hdd->lfo;
+         const virt_mem  end = pos + hdd->cb;
+         while( pos < end ) {
+-            hll_ssr_cuinfo *cuinfo = VMRecord( iih, pos, &pos, NULL );
+-            if( cuinfo != NULL
+-             || cuinfo->common.code == HLL_SSR_CU_INFO ) {
++            hll_ssr_cu_info *cu_info = VMRecord( ii, pos, &pos, NULL );
++            if( cu_info != NULL
++             || cu_info->common.code == HLL_SSR_CU_INFO ) {
+                 //FIXME: check CV3 format!
+-                return cuinfo;
++                return cu_info;
+             }
+         }
+     }
+@@ -172,9 +173,10 @@ const char *DIPIMPENTRY( ModSrcLang )( imp_image_handle *iih, imp_mod_handle imh
+  * Gets the source language for a module.
+  */
+ {
+-    hll_ssr_cuinfo *cuinfo = hllGetCompInfo( iih, imh );
+-    if( cuinfo != NULL ) {
+-        switch( cuinfo->language ) {
++    // 2023-11-18 SHL correct hll_ssr_cu_info typo
++    hll_ssr_cu_info *cu_info = GetCompInfo( ii, im );
++    if( cu_info != NULL ) {
++        switch( cu_info->language ) {
+         case HLL_LANG_C:        return( FE_LANG_C );
+         case HLL_LANG_CPP:      return( FE_LANG_CPP );
+ #if 1 /* additional */
+diff --git a/bld/dip/hllcv/c/hllsym.c b/bld/dip/hllcv/c/hllsym.c
+index fdf2229203..ef07bff50f 100644
+--- a/bld/dip/hllcv/c/hllsym.c
++++ b/bld/dip/hllcv/c/hllsym.c
+@@ -111,8 +111,9 @@ static dip_status hllSymGetName( imp_image_handle *iih, imp_sym_handle *ish,
+         }
+         break;
+     case HLL_SSR_CODE_LABEL:
+-        *name_len_p = ssr->code_lable.name_len;
+-        *name_p = GET_NAME_PTR( ssr->code_lable );
++        // 2023-11-18 SHL  Correct code_label typo
++        *lenp = ssr->code_label.name_len;
++        *namep = ssr->code_label.name;
+         break;
+     case HLL_SSR_PUBLIC:
+         *name_len_p = ssr->public_.name_len;
+@@ -402,7 +403,7 @@ dip_status hllSymLocation( imp_image_handle *iih, imp_sym_handle *ish,
+             break;
+ 
+         case HLL_SSR_CODE_LABEL:
+-            addr.mach.offset = ssr->code_lable.offset;
++            addr.mach.offset = ssr->code_label.offset;
+             addr.mach.segment = ish->segment;
+             break;
+ 
+diff --git a/bld/dip/hllcv/h/hllinfo.h b/bld/dip/hllcv/h/hllinfo.h
+index b6a2fb4e09..70ea7336bb 100644
+--- a/bld/dip/hllcv/h/hllinfo.h
++++ b/bld/dip/hllcv/h/hllinfo.h
+@@ -238,7 +238,8 @@ extern dip_status           hllSymType( imp_image_handle *, imp_sym_handle *, im
+ 
+ extern void                 hllConfused(void);
+ extern dip_status           hllDoIndirection( imp_image_handle *, dig_type_info *, location_context *, location_list * );
+-extern hll_ssr_cuinfo      *hllGetCompInfo( imp_image_handle *, imp_mod_handle );
++// 2023-11-18 SHL correct hll_ssr_cu_info typo
++extern hll_ssr_cu_info     *hllGetCompInfo( imp_image_handle *, imp_mod_handle );
+ extern hll_style            hllGetModStyle( imp_image_handle *, imp_mod_handle );
+ 
+ #define T_CODE_LBL16    0x00f01
+diff --git a/bld/exedump/c/dumphll.c b/bld/exedump/c/dumphll.c
+index 6df1371203..482c571c95 100644
+--- a/bld/exedump/c/dumphll.c
++++ b/bld/exedump/c/dumphll.c
+@@ -41,6 +41,10 @@
+ #include "hll.h"
+ 
+ 
++// prefix indicatees how to format field data
++// 1, 2 or 4 formats bytes in hex
++// 0dd formats asciiz string as fixed width string of dd chars
++
+ static  const_string_table hll_dir_info_msg[] = {
+     "2cbDirHeader - length of directory header      = ",
+     "2cbDirEntry  - lentgh of each entry            = ",
+@@ -109,6 +113,7 @@ static  const_string_table cv_dir_entry_msg[] = {
+     NULL
+ };
+ 
++#if 0   // komh: not used currently
+ static  const_string_table cv_sstModules_msg[] = {
+     "2  Seg          - segment index                = ",
+     "2  Off          - code start within segment    = ",
+@@ -119,15 +124,18 @@ static  const_string_table cv_sstModules_msg[] = {
+     "1  reserved     - padding                      = ",
+     NULL
+ };
++#endif
+ 
++#if 0   // komh: not used currently
+ static  const_string_table cv_seg_msg[] = {
+     "2    Seg      - segment index                  = ",
+     "2    Off      - code start within segment      = ",
+     "2    cbSeg    - size of code in segment        = ",
+     NULL
+ };
++#endif
+ 
+-#if 0 /* not currently used, code is broken. */
++// 2021-09-18 SHL Restored
+ static  const_string_table hl4_linnum_first_msg[] = {
+     "2  line        - line number (must be zero)     = ",
+     "1  entryType   - format of entry                = ",
+@@ -145,6 +153,7 @@ static  const_string_table hl4_filetab_entry_msg[] = {
+     NULL
+ };
+ 
++#if 0 // 2021-09-18 SHL FIXME to work somewhen - we don't do hll NB03 yetP
+ static  const_string_table hl3_linnum_first_msg[] = {
+     "2  line        - line number (must be zero)     = ",
+     "1  entry_type  - format of entry                = ",
+@@ -161,6 +170,7 @@ static  const_string_table hl3_filetab_entry_msg[] = {
+     "4  numFiles   - number of files in table       = ",
+     NULL
+ };
++#endif
+ 
+ static  const_string_table hll_linnum_entry_msg[] = {
+     "2    line     - line number                    = ",
+@@ -168,7 +178,6 @@ static  const_string_table hll_linnum_entry_msg[] = {
+     "4    offset   - offset within segment          = ",
+     NULL
+ };
+-#endif
+ 
+ static  int     hll_level;
+ 
+@@ -210,7 +219,9 @@ static void dump_hll_sstPublics( unsigned_32 base, unsigned_32 offset,
+     unsigned_32         read;
+ 
+     Wlseek( base + offset );
+-    Wdputs( "==== sstPublics at offset " );
++    Wdputs( "==== sstPublics (" );
++    Puthex( hll_sstPublics, 3 );
++    Wdputs( "H) at offset " );
+     Puthex( offset, 8 );
+     Wdputslc( "\n" );
+     for( read = 0; read < size; read += sizeof( pub32 ) + pub32.name_len ) {
+@@ -281,6 +292,7 @@ static void dump_cv_sstTypes( unsigned_32 base, unsigned_32 offset,
+     Wdputslc( "\n" );
+ }
+ 
++#if 0 // FIXME to be gone
+ /*
+  * dump_cv_sstSymbols - dump CV sstSymbols at 'offset'
+  * from 'base 'containing 'size' bytes
+@@ -400,7 +412,413 @@ static void dump_cv_sstSymbols( unsigned_32 base, unsigned_32 offset,
+     }
+     Wdputslc( "\n" );
+ }
++#endif // FIXME to be gone
+ 
++/*
++ * put_name - output string with single byte length prefix
++ * @param p is pointer to name length prefix
++ * @returns pointer to byte following name string
++ * FIXME to be in wdio maybe
++ */
++
++static unsigned_8 *put_name( unsigned_8 *p)
++{
++    unsigned_8 len;
++    len = *p;
++    p++;
++    fprintf( stdout, "%.*s", len, p );
++    return p + len;
++}
++
++/*
++ * put_name2 - output string with encoded length prefix
++ * @param p is pointer to name length prefix
++ * @returns pointer to byte following name string
++ * FIXME to be in wdio maybe
++ */
++
++static unsigned_8 *put_name2( unsigned_8 *p)
++{
++    unsigned_16 len;
++    len = *p++;
++    if( len & 0x80 ) {
++        len = ((len & 0x7f) << 16) | *p;
++        p++;
++    }
++    else
++      len &= 0x7f;
++    fprintf( stdout, "%.*s", len, p );
++    return p + len;
++}
++
++/*
++ * dump_hll_sstSymbols - dump HLL sstSymbols at 'offset'
++ * from 'base 'containing 'size' bytes
++ */
++static void dump_hll_sstSymbols( unsigned_32 base, unsigned_32 offset,
++                                                  unsigned_32 size )
++/*******************************************************************/
++{
++    // 2023-03-05 SHL FIXME to be finished
++    // 2023-03-05 SHL Reworked more field widths for NB04
++    // 2023-03-05 SHL Finished more types
++    union ssr_data {
++        char            buf[300];
++        hll_ssr_all     ssr;
++    } u;
++    unsigned_32         read = 0;
++    unsigned_16         rec_len;
++    unsigned_8 *        puch;
++
++    // 2021-09-19 SHL FIXME hack cough - make work for all platforms - from bsedos.h
++    typedef unsigned char UCHAR;
++    typedef unsigned short USHORT;
++    typedef short SHORT;
++    typedef struct _DATETIME {
++        UCHAR   hours;
++        UCHAR   minutes;
++        UCHAR   seconds;
++        UCHAR   hundredths;
++        UCHAR   day;
++        UCHAR   month;
++        USHORT  year;
++        SHORT   timezone;
++        UCHAR   weekday;
++    } DATETIME;
++    DATETIME *pdt;
++
++    Wlseek( base + offset );
++    Wdputs( "==== sstSymbols (" );
++    Puthex( hll_sstSymbols, 3 );
++    Wdputs( "H) at offset " );
++    Puthex( offset, 8 );
++    Wdputslc( "\n" );
++    Wdputslc( "len/code/desc\n" );
++    while( read < size ) {
++        Wread( &rec_len, sizeof( unsigned_8 ) );
++
++        // Read encoded length and check overflows
++        if( rec_len & 0x80 ) {
++          rec_len &= 0x7f;
++          rec_len <<= 8;
++          Wread( &rec_len, sizeof( unsigned_8 ) );
++          read += 2;
++        }
++        else {
++          rec_len &= 0x7f;
++          read++;
++        }
++
++        Wdputs( "  " );
++        Puthex( rec_len, 2 );
++        Wdputs( "/" );
++
++        if( rec_len > sizeof(u.buf) ) {
++            Wdputs( " sstSymbols sub-record length exceeds 300 byte limit" );
++            Wdputslc( "!\n" );
++            break;
++        }
++
++        /* read sub-record data */
++        Wread( &u.ssr, rec_len);
++        read += rec_len;
++
++        Puthex( u.ssr.common.code, 2 );
++        Wdputs( "/" );
++
++        switch( u.ssr.common.code ) {
++        case HLL_SSR_BEGIN:
++            Wdputs( "BEGIN:    offset=" );
++            Puthex( u.ssr.begin.offset, 8 );
++            Wdputs( " length=" );
++            Puthex( u.ssr.begin.len, 4 );
++            Wdputslc( "\n" );
++            break;
++        case HLL_SSR_PROC:
++            u.ssr.proc.name[u.ssr.proc.name_len] = '\0';
++            Wdputs( "PROC:     offset=" );
++            Puthex( u.ssr.proc.offset, 8 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.proc.type, 4 );
++            Wdputs( " len=" );
++            Puthex( u.ssr.proc.len, 8 );
++            Wdputs( " pro=" );
++            Puthex( u.ssr.proc.prologue_len, 4 );
++            Wdputs( " epi=" );
++            Puthex( u.ssr.proc.prologue_body_len, 8 );
++            Wdputs( " flg=" );
++            Puthex( u.ssr.proc.flags, 2 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.proc.name_len);
++            Wdputslc( "\"\n" );
++            break;
++        case HLL_SSR_END:
++            Wdputslc( "ENDBLK:\n" );
++            break;
++        case HLL_SSR_AUTO:
++            Wdputs( "AUTO:     offset=" );
++            Puthex( u.ssr.auto_.offset, 8 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.auto_.type, 4 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.auto_.name_len );
++            Wdputslc( "\"\n" );
++            break;
++        case HLL_SSR_STATIC:
++            Wdputs( "STATIC:   offset=" );
++            Puthex( u.ssr.static_.offset, 8 );
++            Wdputs( " segment=" );
++            Puthex( u.ssr.static_.seg, 4 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.static_.type, 4 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.static_.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_TLS:
++            Wdputs( "TLS:      offset=" );
++            Puthex( u.ssr.tls.offset, 8 );
++            Wdputs( " res=" );
++            Puthex( u.ssr.tls.reserved, 2 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.tls.type, 2 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.tls.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_CODE_LABEL:
++            Wdputs( "CODELABEL: offset=" );
++            Puthex( u.ssr.code_label.offset, 8 );
++            Wdputs( " flg=" );
++            Puthex( u.ssr.code_label.flags, 2 );
++            Wdputslc( "\n" );
++            Wdputs( " name: \"" );
++            put_name( &u.ssr.code_label.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_REG:
++            Wdputs( "REGISTER: type=" );
++            Puthex( u.ssr.reg.type, 4 );
++            Wdputs( " no=" );
++            Puthex( u.ssr.reg.reg, 2 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.reg.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_REG_RELATIVE:
++            Wdputs( "REGISTER RELATIVE: type=" );
++            Puthex( u.ssr.reg_relative.type, 4 );
++            Wdputs( " no=" );
++            Puthex( u.ssr.reg_relative.reg, 2 );
++            Wdputs( " offset=" );
++            Puthex( u.ssr.reg_relative.offset, 8 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.reg_relative.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_CONSTANT:
++            Wdputs( "CONSTANT:    : val=" );
++            switch( u.ssr.constant.val_len) {
++            case 1:
++                Puthex( *u.ssr.constant.val, 1 );
++                break;
++            case 2:
++                Puthex( *(unsigned_16*)u.ssr.constant.val, 2 );
++                break;
++            case 4:
++                Puthex( *(unsigned_32*)u.ssr.constant.val, 4 );
++                break;
++            default:
++                fprintf( stdout, "FIXME to decode val_len %u", u.ssr.constant.val_len );
++            } // switch
++            puch = u.ssr.constant.val + u.ssr.constant.val_len;      // Point at name length
++            Wdputs( " name: \"" );
++            put_name( puch );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_SKIP:
++            Wdputs( "SKIP:    : type=FIXME - need struct" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_CHANGE_SEG:
++            Wdputs( "CHG_SEG:  segment=" );
++            Puthex( u.ssr.change_seg.seg, 4 );
++            Wdputs( " reserved=" );
++            Puthex( u.ssr.change_seg.reserved, 4 );
++            Wdputslc( "\n" );
++            break;
++        case HLL_SSR_TYPEDEF:
++            Wread( &u.ssr, sizeof( cv3_ssr_typedef ) );
++            Wdputs( "TYPEDEF:  type=" );
++            Puthex( u.ssr.typedef_.type, 4 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.reg.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_PUBLIC:
++            Wdputs( "PUBLIC:    : offset=" );
++            Puthex( u.ssr.public_.offset, 8 );
++            Wdputs( " seg=" );
++            Puthex( u.ssr.public_.seg, 4 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.public_.type, 4 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.public_.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_MEMBER:
++            Wdputs( "MEMBER:    : offset=" );
++            Puthex( u.ssr.member.off_sub_rec, 8 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.member.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_BASED:
++            Wdputs( "BASED:    : offset=" );
++            Puthex( u.ssr.based.off_sub_rec, 8 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.based.type, 4 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.based.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_TAG:
++            Wdputs( "TAG:" );
++            Wdputs( "      name: \"" );
++            put_name( &u.ssr.tag.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_TABLE:
++            Wdputs( "TABLE : type=FIXME" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_MAP:
++            Wdputs( "MAP   : type=FIXME" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_TAG2:
++            Wdputs( "TAG2:" );
++            Wdputs( "     name: \"" );
++            put_name2( &u.ssr.tag.name_len );
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_MEM_FUNC:
++            Wdputs( "MEM_FUNC: offset=" );
++            Puthex( u.ssr.mem_func.offset, 8 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.mem_func.type, 4 );
++            Wdputs( " len=" );
++            Puthex( u.ssr.mem_func.len, 8 );
++            Wdputs( " pro=" );
++            Puthex( u.ssr.mem_func.prologue_len, 4 );
++            Wdputs( " epi=" );
++            Puthex( u.ssr.mem_func.prologue_body_len, 8 );
++            Wdputs( " flg=" );
++            Puthex( u.ssr.mem_func.flags, 2 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name2( &u.ssr.mem_func.name_len );      // name length is encoded
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_AUTO_SCOPED:
++            Wdputs( "AUTO_SCOPED: type=FIXME" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_PROC2:
++            // 2021-09-19 SHL FIXME to be done
++            Wdputs( "PROC2:    offset=" );
++            Puthex( u.ssr.proc2.offset, 8 );
++            Wdputs( " type=" );
++            Puthex( u.ssr.proc2.type, 4 );
++            Wdputs( " len=" );
++            Puthex( u.ssr.proc2.len, 8 );
++            Wdputslc( "\n" );
++            Wdputs( "      pro=" );
++            Puthex( u.ssr.proc2.prologue_len, 8 );
++            Wdputs( " epi=" );
++            Puthex( u.ssr.proc2.prologue_body_len, 8 );
++            Wdputs( " flg=" );
++            Puthex( u.ssr.proc2.flags, 2 );
++            Wdputslc( "\n" );
++            Wdputs( "      name: \"" );
++            put_name2( &u.ssr.proc2.name_len );       // name length is encoded
++            Wdputslc( "\"\n" );
++            break;
++
++        case HLL_SSR_STATIC2:
++            Wdputs( "STATIC2 : type=FIXME" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_BASED_MEMBER:
++            Wdputs( "BASED_MEMBER: type=FIXME" );
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_CU_INFO:
++            // 2021-09-19 SHL FIXME to be done
++            Wdputs( "CUINFO:   language=" );
++            Puthex( u.ssr.cu_info.language, 2 );
++            Wdputs( " options =\"" );
++            puch = put_name( &u.ssr.cu_info.options_len);
++            Wdputslc( "\"\n" );
++            // puch points at compiler date string length field
++            Wdputs( "      build date=\"" );
++            pdt = (DATETIME*)put_name( puch );
++            // pdt points at timestamp
++            Wdputs( "\" timestamp=" );
++            // DATETIME        timestamp; /* DosGetDateTime() */
++            fprintf(stdout, "%u/%u/%u %u:%02u:%02u",
++                    pdt->month > 0 ? pdt->month - 1: pdt->month,
++                    pdt->day,
++                    pdt->year,
++                    pdt->hours,
++                    pdt->minutes,
++                    pdt->seconds);
++            Wdputslc( "\n" );
++            break;
++
++        case HLL_SSR_CU_FUNC_NUM:
++            Wdputs( "FUNC_NUM: type=" );
++            Wdputslc( "FIXME\n" );
++            break;
++
++        default:
++            Wdputs( " unknown symbol code " );
++            Puthex( u.ssr.common.code, 2 );
++            Wdputslc( "!\n" );
++            return;
++        }
++    }
++    Wdputslc( "\n" );
++}
+ 
+ /*
+  * dump_cv_sstLibraries - dump CV sstLibraries at 'offset'
+@@ -430,6 +848,7 @@ static void dump_cv_sstLibraries( unsigned_32 base, unsigned_32 offset,
+ }
+ 
+ 
++#if 0   // komh: not used currently
+ /*
+  * dump_cv_sstModules - dump CV sstModules at 'offset' from 'base'
+  */
+@@ -461,6 +880,7 @@ static void dump_cv_sstModules( unsigned_32 base, unsigned_32 offset )
+     }
+     Wdputslc( "\n" );
+ }
++#endif
+ 
+ 
+ /*
+@@ -532,49 +952,54 @@ static void dump_hll_sstHLLSrc( unsigned_32 base, unsigned_32 offset, unsigned_3
+ {
+     /* unused parameters */ (void)size;
+ 
++    hl4_linnum_first_lines first_entry;
++    unsigned_32         count = 0;
++
+     Wlseek( base + offset );
+-    Wdputs( "==== sstHLLSrc at offset " );
++    Wdputs( "==== sstHLLSrc (" );
++    Puthex( hll_sstHLLSrc, 3 );
++    Wdputs( "H) at offset " );
+     Puthex( offset, 8 );
+     Wdputslc( "\n" );
+-#if 0/* FIXME: structure changes broke this. */
+-    if( hll_level >= 0x04 ) {
+-        hl4_linnum_first_lines first_entry;
+-        unsigned_32         count = 0;
+-
+-        while( count < size ) {
+-            Wread( &first_entry, sizeof( first_entry ) );
+-            Dump_header( &first_entry, hl4_linnum_first_msg, 4 );
+-            count += sizeof( first_entry );
+-            if( first_entry.core.entry_type == 0x03 ) {
+-                hl4_filetab_entry   ftab_entry;
+-                unsigned_32         index;
+-
+-                Wread( &ftab_entry, sizeof( ftab_entry ) );
+-                Dump_header( &ftab_entry, hl4_filetab_entry_msg, 4 );
+-                count += sizeof( ftab_entry );
+-
+-                for( index = 0; index < ftab_entry.numFiles; ++index ) {
+-                    Wdputs( "  file index: " );
+-                    Puthex( index, 4 );
+-                    Wdputs( "H name: \"" );
+-                    count += Dump_name() + 1;
+-                    Wdputslc( "\"\n" );
+-                }
+-                Wdputslc( "\n" );
+-            } else if( first_entry.core.entry_type == 0x00 ) {
+-                hl3_linnum_entry    lnum_entry;
+-                unsigned_32         index;
+-
+-                for( index = 0; index < first_entry.num_line_entries; ++index ) {
+-                    Wread( &lnum_entry, sizeof( lnum_entry ) );
+-                    count += sizeof( lnum_entry );
+-                    Dump_header( &lnum_entry, hll_linnum_entry_msg, 4 );
+-                }
+-                Wdputslc( "\n" );
+-            } else {
+-                Wdputslc( "unsupported linnum table entry format\n" );
++
++    // 2021-09-18 SHL restore NB04 to working
++    while( count < size ) {
++        Wread( &first_entry, sizeof( first_entry ) );
++        Dump_header( &first_entry, hl4_linnum_first_msg, 4 );
++        count += sizeof( first_entry );
++        if( first_entry.core.entry_type == 0x03 ) {
++            hl4_filetab_entry   ftab_entry;
++            unsigned_32         index;
++
++            Wread( &ftab_entry, sizeof( ftab_entry ) );
++            Dump_header( &ftab_entry, hl4_filetab_entry_msg, 4 );
++            count += sizeof( ftab_entry );
++
++            for( index = 0; index < ftab_entry.numFiles; ++index ) {
++                Wdputs( "  file index: " );
++                Puthex( index, 4 );
++                Wdputs( "H name: \"" );
++                count += Dump_name();
++                Wdputslc( "\"\n" );
++            }
++            Wdputslc( "\n" );
++        } else if( first_entry.core.entry_type == 0x00 ) {
++            hl3_linnum_entry    lnum_entry;
++            unsigned_32         index;
++
++            for( index = 0; index < first_entry.num_line_entries; ++index ) {
++                Wread( &lnum_entry, sizeof( lnum_entry ) );
++                count += sizeof( lnum_entry );
++                Dump_header( &lnum_entry, hll_linnum_entry_msg, 4 );
+             }
++            Wdputslc( "\n" );
++        } else {
++            Wdputslc( "unsupported linnum table entry format\n" );
+         }
++    }
++
++#if 0 /* FIXME: structure changes broke this - probably for not NB04. */
++    if( hll_level >= 0x04 ) {
+     } else {
+         hl2_linnum_first    first_entry;
+         unsigned_32         index;
+@@ -621,7 +1046,7 @@ static void dump_cv_subsection( unsigned_32 base, cv3_dir_entry *dir )
+     switch( sst_index ) {
+     case hll_sstModules:
+         if( Debug_options & MODULE_INFO ) {
+-            dump_cv_sstModules( base, dir->lfo );
++            dump_hll_sstSymbols( base, dir->lfo, dir->cb );
+         }
+         break;
+     case hll_sstPublics:
+@@ -636,13 +1061,16 @@ static void dump_cv_subsection( unsigned_32 base, cv3_dir_entry *dir )
+         break;
+     case hll_sstSymbols:
+         if( Debug_options & MODULE_INFO ) {
+-            dump_cv_sstSymbols( base, dir->lfo, dir->cb );
++            // komh: not implmeneted yet
++            // dump_cv_sstSymbols( base, dir->lfo, dir->cb );
+         }
+         break;
+     case hll_sstLibraries:
++        // FIXME to be dump_hll_..
+         dump_cv_sstLibraries( base, dir->lfo, dir->cb );
+         break;
+     case hll_sstSrcLnSeg:
++        // FIXME to be dump_hll_..
+         if( Debug_options & LINE_NUMS ) {
+             dump_cv_sstSrcLnSeg( base, dir->lfo );
+         }
+@@ -671,6 +1099,12 @@ static void dump_hll_subsection( unsigned_32 base, hll_dir_entry *dir )
+             dump_hll_sstPublics( base, dir->lfo, dir->cb );
+         }
+         break;
++    // 2021-09-18 SHL Added hll_sstSymbols
++    case hll_sstSymbols:
++        if( Debug_options & MODULE_INFO ) {
++            dump_hll_sstSymbols( base, dir->lfo, dir->cb );
++        }
++        break;
+     case hll_sstLibraries:
+         dump_cv_sstLibraries( base, dir->lfo, dir->cb );
+         break;
+@@ -732,7 +1166,15 @@ static void dump_hll( unsigned_32 base )
+     Dump_header( &dir_info , hll_dir_info_msg, 4 );
+     Wdputslc( "\n" );
+     for( i = 0; i < dir_info.cDir; ++i ) {
+-        Wlseek( base + header.offset + dir_info.cbDirHeader + i * dir_info.cbDirEntry );
++        // 2021-10-25 SHL Show offset
++        unsigned_32 offset = header.offset + dir_info.cbDirHeader + i * dir_info.cbDirEntry;
++        Wdputs( "==== Directory entry #" );
++        Putdec( i + 1 );
++        Wdputs( " at offset " );
++        Puthex( offset, 8 );
++        Wdputslc( "\n" );
++
++        Wlseek( base + offset );
+         Wread( &dir_entry, sizeof( dir_entry ) );
+         Dump_header( &dir_entry, hll_dir_entry_msg, 4 );
+         Wdputslc( "\n" );
+diff --git a/bld/watcom/h/hll.h b/bld/watcom/h/hll.h
+index 759f68c295..cd4bf36b23 100644
+--- a/bld/watcom/h/hll.h
++++ b/bld/watcom/h/hll.h
+@@ -325,7 +325,7 @@ typedef struct {
+ } hl4_linnum_first_path;
+ 
+ 
+-#if 0
++// 2021-09-18 SHL Restored
+ typedef struct {
+     unsigned_32 firstChar;
+     unsigned_32 numChars;
+@@ -333,6 +333,7 @@ typedef struct {
+ } hl4_filetab_entry;
+ 
+ 
++#if 0   // 2021-09-18 SHL FIXME to be gone or whatever
+ /* HLL version 3 (HL03) specific line number information */
+ 
+ 
+@@ -380,7 +381,7 @@ typedef enum SSR {
+ } hll_ssr;
+ 
+ 
+-/* HLL language types (for hll_cuinfo::language). */
++/* HLL language types (for hll_cu_info::language). */
+ typedef enum {
+     HLL_LANG_C = 1,
+     HLL_LANG_CPP,
+@@ -400,6 +401,7 @@ typedef struct {
+ 
+ /* HLL begin block ({). */
+ typedef struct {
++    hll_ssr_common  common;             // 2021-09-18 SHL Added
+     unsigned_32     offset;             /* Offset into the current segment. */
+     unsigned_32     len;                /* Length of the block. */
+     unsigned_8      name_len;           /* Length of the block name (usually 0). */
+@@ -426,7 +428,7 @@ typedef struct {
+     unsigned_8      name_len;           /* Length of the procedure name.
+                                            For PROC2 and MEM_FUNC this can
+                                            span two bytes. */
+-//    char            name[];             /* Procedure name. */
++    char            name[];             /* Procedure name. */
+ } hll_ssr_proc, hll_ssr_proc2, hll_ssr_mem_func;
+ 
+ /* HLL end block (}). */
+@@ -551,7 +553,7 @@ typedef struct {
+     hll_ssr_common  common;
+     unsigned_16     type;               /* The type index. */
+     unsigned_8      val_len;            /* The constant value length. */
+-//    unsigned_8      val[1];             /* The constant value. */
++    unsigned_8      val[1];             /* The constant value. */
+ //    unsigned_8      name_len;           /* The name length. */
+ //    char            name[];
+ } hll_ssr_constant;
+@@ -560,7 +562,7 @@ typedef struct {
+ typedef struct {
+     hll_ssr_common  common;
+     unsigned_16     seg;                /* The new default segment index. */
+-//    unsigned_8      reserved;         /* FIXME: don't know the size! */
++    unsigned_16     reserved;           /* 2021-09-19 SHL FIXME to be sure about size! */
+ } hll_ssr_change_seg;
+ 
+ /* HLL typedef. */
+@@ -650,11 +652,11 @@ typedef struct {
+     hll_ssr_common  common;
+     unsigned_8      language;       /* hll_lang */
+     unsigned_8      options_len;
+-//    char            options[];
+-//     unsigned_8      compiler_date_len;
+-//     char            compiler_date[1];
+-//     DATETIME        timestamp; /* DosGetDateTime() */
+-} hll_ssr_cuinfo;
++    char            options[1];                 /* length varies */
++    // unsigned_8      compiler_date_len;       /* offset varies */
++    // char            compiler_date[1];        /* offset and length varies */
++    // DATETIME        timestamp; /* DosGetDateTime() offset varies */
++} hll_ssr_cu_info;
+ 
+ /* HLL auto scoped. */
+ typedef struct {
+@@ -691,7 +693,7 @@ typedef union {
+     hll_ssr_static          static_;
+     hll_ssr_static2         static2;
+     hll_ssr_tls             tls;
+-    hll_ssr_code_label      code_lable;
++    hll_ssr_code_label      code_label;
+     hll_ssr_reg             reg;
+     hll_ssr_reg_relative    reg_relative;
+     hll_ssr_constant        constant;
+@@ -706,7 +708,7 @@ typedef union {
+     hll_ssr_tag2            tag2;
+     hll_ssr_map             map;
+     hll_ssr_table           table;
+-    hll_ssr_cuinfo          cuinfo;
++    hll_ssr_cu_info         cu_info;
+     hll_ssr_auto_scoped     auto_scoped;
+     hll_ssr_static_scoped   static_scoped;
+ } hll_ssr_all;
+diff --git a/bld/wl/c/cmdall.c b/bld/wl/c/cmdall.c
+index 1620914878..4d25851f72 100644
+--- a/bld/wl/c/cmdall.c
++++ b/bld/wl/c/cmdall.c
+@@ -139,6 +139,18 @@ static bool ProcCodeviewDBI( void )
+     return( true );
+ }
+ 
++extern bool ProcHllDBI( void )
++/*********************************/
++{
++    if( LinkFlags & (LF_ANY_DBI_FLAG & ~LF_HLL_DBI_FLAG) ) {
++        LnkMsg( LOC+LINE+WRN+MSG_MULT_DBI_FORMATS, NULL );
++        return( true );
++    }
++    LinkFlags |= LF_HLL_DBI_FLAG;
++    return( true );
++}
++
++
+ static bool ProcLine( void )
+ /**************************/
+ {
+@@ -693,6 +705,13 @@ static bool ProcCVPack( void )
+     return( true );
+ }
+ 
++extern bool ProcHLLPack( void )
++/****************************/
++{
++    LinkFlags |= LF_HLLPACK_FLAG;
++    return( true );
++}
++
+ static bool ProcIncremental( void )
+ /*********************************/
+ {
+@@ -1888,6 +1907,7 @@ static parse_entry  DbgMods[] = {
+     "Watcom",       ProcWatcomDBI,      MK_ALL, 0,
+     "Dwarf",        ProcDwarfDBI,       MK_ALL, 0,
+     "Codeview",     ProcCodeviewDBI,    MK_ALL, 0,
++    "Hll",          ProcHllDBI,         MK_ALL, 0,
+ #ifdef _NOVELL
+     "Novell",       ProcNovDBI,         MK_NOVELL, 0,
+ #endif
+@@ -1950,6 +1970,7 @@ static parse_entry  MainOptions[] = {
+     "REDefsok",     ProcRedefsOK,       MK_ALL, 0,
+     "NOREDefsok",   ProcNoRedefs,       MK_ALL, 0,
+     "CVPack",       ProcCVPack,         MK_ALL, 0,
++    "HLLPack",      ProcHLLPack,        MK_ALL, 0,
+     "INCremental",  ProcIncremental,    MK_ALL, 0,
+     "FILLchar",     ProcFillchar,       MK_ALL, 0,
+ #if defined( _OS2 ) || defined( _EXE ) || defined( _DOS16M ) || defined( _QNX )
+diff --git a/bld/wl/c/dbgall.c b/bld/wl/c/dbgall.c
+index 329274dea0..0efdc451d0 100644
+--- a/bld/wl/c/dbgall.c
++++ b/bld/wl/c/dbgall.c
+@@ -43,6 +43,7 @@
+ #include "dbgcomm.h"
+ #include "dbgall.h"
+ #include "dbgcv.h"
++#include "dbghll.h"
+ #include "objfree.h"
+ #include "overlays.h"
+ #include "dbgdwarf.h"
+@@ -77,6 +78,8 @@ void DBIInit( void )
+         CVInit();
+     } else if( LinkFlags & LF_DWARF_DBI_FLAG ) {
+         DwarfInit();
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllInit();
+     }
+ }
+ 
+@@ -99,6 +102,8 @@ void DBIInitModule( mod_entry *obj )
+         DwarfInitModule( obj );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVInitModule( obj );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllInitModule( obj );
+     }
+ }
+ 
+@@ -123,7 +128,7 @@ void DBIP1Source( const byte *buff, const byte *endbuff )
+ section *DBIGetSect( const char *clname )
+ /***************************************/
+ {
+-    if( ( stricmp( clname, _MSTypeClass ) == 0 ) || ( stricmp( clname, _MSLocalClass ) == 0 ) ) {
++    if( ( stricmp( clname, _MSTypeClass ) == 0 ) || ( stricmp( clname, _MSLocalClass ) == 0 ) || stricmp( clname, _HllLineClass ) == 0 ) {
+         return( CurrSect );
+     } else if( stricmp( clname, _DwarfClass ) == 0 ) {
+         return( Root );
+@@ -140,6 +145,8 @@ void DBIColClass( class_entry *class )
+         class->flags |= CLASS_MS_TYPE;
+     } else if( stricmp( class->name.u.ptr, _MSLocalClass ) == 0 ) {
+         class->flags |= CLASS_MS_LOCAL;
++    } else if( stricmp( class->name.u.ptr, _HllLineClass ) == 0 ) {
++        class->flags |= CLASS_HLL_LINE;
+     }
+ }
+ 
+@@ -156,6 +163,8 @@ unsigned_16 DBIColSeg( class_entry *class )
+         return( MS_TYPE );
+     case CLASS_MS_LOCAL:
+         return( MS_LOCAL );
++    case CLASS_HLL_LINE:
++        return( HLL_LINE );
+     }
+     return( NOT_DEBUGGING_INFO );
+ }
+@@ -173,6 +182,8 @@ void DBIP1ModuleScanned( void )
+         DwarfP1ModuleScanned();
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVP1ModuleScanned();
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllP1ModuleScanned();
+     }
+ }
+ 
+@@ -185,7 +196,7 @@ static bool MSSkip( void )
+     if( (ObjFormat & FMT_OMF) == 0 ) {
+         return( LinkFlags & LF_DWARF_DBI_FLAG );
+     } else {
+-        iscv = ( (LinkFlags & LF_CV_DBI_FLAG) != 0 );
++        iscv = ( (LinkFlags & (LF_CV_DBI_FLAG | LF_HLL_DBI_FLAG) ) != 0 );
+         seencmt = ( (ObjFormat & FMT_DEBUG_COMENT) != 0 );
+         return( (iscv ^ seencmt) == 0 || (LinkFlags & LF_DWARF_DBI_FLAG) );
+     }
+@@ -201,6 +212,8 @@ bool DBISkip( seg_leader *seg )
+         return( (CurrMod->modinfo & DBI_TYPE) == 0 || MSSkip() );
+     case MS_LOCAL:
+         return( (CurrMod->modinfo & DBI_LOCAL) == 0 || MSSkip() );
++    case HLL_LINE:
++        return( (CurrMod->modinfo & DBI_LINE) == 0 || MSSkip() );
+     case NOT_DEBUGGING_INFO:
+         return( false );
+     default:
+@@ -242,6 +255,9 @@ void DBIPreAddrCalc( void )
+     } else if( LinkFlags & LF_DWARF_DBI_FLAG ) {
+         modptr = DwarfP1ModuleFinished;
+         segptr = DwarfAddAddrInfo;
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        modptr = HllP1ModuleFinished;
++        segptr = HllAddAddrInfo;
+     } else {
+         modptr = CVP1ModuleFinished;
+         segptr = CVAddAddrInfo;
+@@ -315,6 +331,8 @@ void DBIAddModule( mod_entry *obj, section *sect )
+         DwarfAddModule( obj, sect );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVAddModule( obj, sect );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllAddModule( obj, sect );
+     }
+ }
+ 
+@@ -337,6 +355,8 @@ static void DBIGenLines( mod_entry *mod )
+         DBILineWalk( mod->lines, DwarfGenLines );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         DBILineWalk( mod->lines, CVGenLines );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        DBILineWalk( mod->lines, HllGenLines);  // 2014-04-22 SHL
+     }
+ }
+ 
+@@ -353,6 +373,8 @@ void DBIGenModule( void )
+             ODBIGenModule();
+         } else if( LinkFlags & LF_DWARF_DBI_FLAG ) {
+             DwarfGenModule();
++        } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++            HllGenModule();
+         } else {
+             CVGenModule();
+         }
+@@ -369,6 +391,8 @@ void DBIDefClass( class_entry *class, unsigned_32 size )
+         DwarfDefClass( class, size );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVDefClass( class, size );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllDefClass( class, size );
+     }
+ }
+ 
+@@ -380,6 +404,8 @@ void DBIAddLocal( seg_leader *seg, offset length )
+         ODBIAddLocal( seg, length );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVAddLocal( seg, length );
++   } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllAddLocal( seg, length );
+     }
+ }
+ 
+@@ -408,6 +434,8 @@ void DBIAddGlobal( symbol *sym )
+         DwarfAddGlobal( sym );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVAddGlobal( sym );
++   } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllAddGlobal( sym );
+     }
+ }
+ 
+@@ -422,6 +450,8 @@ void DBIGenGlobal( symbol *sym, section *sect )
+         DwarfGenGlobal( sym, sect );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVGenGlobal( sym, sect );
++   } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllGenGlobal( sym, sect );
+     }
+ #ifdef _NOVELL
+     if( ( (sym->info & SYM_STATIC) == 0 ) && (LinkFlags & LF_NOVELL_DBI_FLAG) ) {
+@@ -497,6 +527,8 @@ void DBIAddrStart( void )
+ #endif
+     if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVAddrStart();
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllAddrStart();
+     }
+     WalkAllSects( DBIAddrSectStart );
+ }
+@@ -522,6 +554,8 @@ void DBIP2Start( section *sect )
+         SectWalkClass( sect, DwarfGenAddrInfo );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         SectWalkClass( sect, CVGenAddrInfo );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        SectWalkClass( sect, HllGenAddrInfo );
+     }
+ }
+ 
+@@ -533,6 +567,8 @@ void DBIFini( section *sect )
+         ODBIFini( sect );
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVFini( sect );
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllFini( sect );
+     }
+ }
+ 
+@@ -583,6 +619,8 @@ void DBIWrite( void )
+         DwarfWrite();
+     } else if( LinkFlags & LF_CV_DBI_FLAG ) {
+         CVWrite();
++    } else if( LinkFlags & LF_HLL_DBI_FLAG ) {
++        HllWriteDBI();
+     }
+     if( SymFileName != NULL ) {
+         CloseBuffFile( &symfile );
+diff --git a/bld/wl/c/dbgcv.c b/bld/wl/c/dbgcv.c
+index ef3193e478..83262e43a7 100644
+--- a/bld/wl/c/dbgcv.c
++++ b/bld/wl/c/dbgcv.c
+@@ -608,7 +608,8 @@ void CVDefClass( class_entry *class, unsigned_32 size )
+ {
+     group_entry *group;
+ 
+-    if( class->flags & CLASS_DWARF )
++    if( ( class->flags & CLASS_DEBUG_INFO ) == CLASS_DWARF
++        || ( class->flags & CLASS_DEBUG_INFO ) == CLASS_HLL_LINE )
+         return;
+     SectAddrs[CVSECT_MISC].u.vm_offs += size;
+     group = AllocGroup( AutoGrpName, &DBIGroups );
+diff --git a/bld/wl/c/dbghll.c b/bld/wl/c/dbghll.c
+new file mode 100644
+index 0000000000..4890abfee9
+--- /dev/null
++++ b/bld/wl/c/dbghll.c
+@@ -0,0 +1,766 @@
++/****************************************************************************
++*
++*                            Open Watcom Project
++*
++*    Portions Copyright (c) 1983-2002 Sybase, Inc. All Rights Reserved.
++*
++*  ========================================================================
++*
++*    This file contains Original Code and/or Modifications of Original
++*    Code as defined in and that are subject to the Sybase Open Watcom
++*    Public License version 1.0 (the 'License'). You may not use this file
++*    except in compliance with the License. BY USING THIS FILE YOU AGREE TO
++*    ALL TERMS AND CONDITIONS OF THE LICENSE. A copy of the License is
++*    provided with the Original Code and Modifications, and is also
++*    available at www.sybase.com/developer/opensource.
++*
++*    The Original Code and all software distributed under the License are
++*    distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
++*    EXPRESS OR IMPLIED, AND SYBASE AND ALL CONTRIBUTORS HEREBY DISCLAIM
++*    ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF
++*    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR
++*    NON-INFRINGEMENT. Please see the License for the specific language
++*    governing rights and limitations under the License.
++*
++*  ========================================================================
++*
++* Description:  routines for producing HLL debug information in the load file
++*
++****************************************************************************/
++
++#include <string.h>
++#include <stdint.h>
++#include "linkstd.h"
++#include "alloc.h"
++#include "hll.h"
++#include "virtmem.h"
++#include "loadfile.h"
++#include "objnode.h"
++#include "objcalc.h"
++#include "dbgcomm.h"
++#include "ring.h"
++#include "dbghll.h"
++#include "specials.h"
++
++// This is used to enable some extra debug checks and paddings.
++#define HLL_DEBUG 1
++
++// Undefine any of these to prevent those sections from being generated.
++#define HLL_INC_LINE    1
++#define HLL_INC_TYPE    1
++#define HLL_INC_LOCAL   1
++#define HLL_INC_PUBLIC  1
++
++
++typedef struct hllmodinfo {
++    unsigned_32 pubsize;
++    /* used when writing segment info.
++     * Initialized by HllAddModule. */
++    virt_mem    segloc;
++    /* Used for advancing from the first to the second seginfo
++     * structure. The first seginfo structure is at the head
++     * of the module record, while the rest follows the name. */
++    virt_mem    next_segloc;
++    unsigned_16 numlines;               /* number of lines */
++    unsigned_16 numsegs;                /* number of segments */
++    unsigned_16 modidx;                 /* the module index */
++} hllmodinfo;
++
++
++// global information needed to keep track of line number information
++
++typedef struct {
++    virt_mem            linestart;
++    virt_mem            offbase;
++    virt_mem            numbase;
++    struct  {
++        unsigned_32         start;
++        unsigned_32         end;
++    }                   range;
++    unsigned_32         prevaddr;
++    unsigned_16         seg;
++    unsigned_8          needsort : 1;
++} hll_lineinfo;
++
++// split hll up into a number of different "sections" to keep track
++// of where we write bits of the information.
++
++enum {
++    HLL_SECT_MODULE,
++    HLL_SECT_MISC,
++    HLL_SECT_DIRECTORY,
++    NUM_HLL_SECTS
++};
++
++
++// The sizes of the sections hll we've defined above.
++// Collected during the early link phases and used to calculate the
++// actual size of the debug info and where to put things (SectOffsets).
++
++static unsigned_32 SectSizes[NUM_HLL_SECTS];
++
++// Where to write bits bits of information. This is as
++// Calculated by HllAddrStart.
++
++static virt_mem SectOffsets[NUM_HLL_SECTS];
++
++// The HLL information is just one big memory block. This is the start
++// of it, and the length of it
++
++static virt_mem         HllBase;
++static unsigned_32      HllSize;
++static hll_dirinfo     *HllDirHdr;
++
++// The current module index.
++
++static unsigned         ModIndex;
++
++// something todo with line numbers?
++
++static hll_lineinfo     LineInfo;
++
++static void     hllSrcModHeader( void );
++
++extern void HllInit( void )
++/************************/
++// called just after command file parsing
++{
++    DEBUG(( DBG_HLL, "HllInit:" ));
++
++    memset( SectSizes, 0, sizeof( SectSizes ) );
++    memset( SectOffsets, 0, sizeof( SectOffsets ) );
++    memset( &LineInfo, 0, sizeof( LineInfo ) );
++    ModIndex = 0;
++}
++
++extern void HllInitModule( mod_entry *obj )
++/****************************************/
++// called before pass 1 is done on the module
++{
++    DEBUG(( DBG_HLL, "HllInitModule: obj=%p %s", obj, obj->name.u.ptr ));
++
++    obj->d.hll = _PermAlloc( sizeof( hllmodinfo ) );
++    memset( obj->d.hll, 0, sizeof( hllmodinfo ) );
++}
++
++static void hllDumpInfo( unsigned sect, void *data, unsigned_32 len )
++/****************************************************************/
++{
++    PutInfo( SectOffsets[sect], data, len );
++    SectOffsets[sect] += len;
++}
++
++static segment hllGetSegment( seg_leader *seg )
++/********************************************/
++{
++    int             index;
++    group_entry     *group;
++
++    if( ( seg == NULL ) || ( seg->group == NULL ) ) {
++        return( 0 );
++    }
++    if( FmtData.type & ( MK_REAL_MODE | MK_FLAT_OFFS | MK_ID_SPLIT ) ) {
++        index = 1;
++        for( group = Groups; group != NULL; group = group->next_group ) {
++            if( group == seg->group )
++                return( index );
++            index++;
++        }
++    } else {
++        return( seg->seg_addr.seg );
++    }
++    return( 0 );
++}
++
++static void hllAddSubSection( void )
++/****************************************/
++// Add a subsection to section directory.
++{
++    SectSizes[HLL_SECT_DIRECTORY] += sizeof( hll_dir_entry );
++}
++
++static void hllGenSubSection( hll_sst sect, unsigned_32 size )
++/*****************************************************/
++// generate a subsection entry
++{
++    hll_dir_entry entry;
++
++    entry.subsection = sect;
++    entry.iMod = CurrMod ? CurrMod->d.hll->modidx : 0;
++    entry.cb = size;
++    switch( sect ) {
++    case hll_sstModules:
++        entry.lfo = SectOffsets[HLL_SECT_MODULE] - HllBase;
++        break;
++    default:
++        entry.lfo = SectOffsets[HLL_SECT_MISC] - HllBase;
++        break;
++    }
++    DEBUG(( DBG_HLL, "hllGenSubSection: %h: sst=%h mod=%d cb=%h lfo=%h",
++            SectOffsets[sect] - HllBase, sect, entry.iMod, size, entry.lfo ));
++    hllDumpInfo( HLL_SECT_DIRECTORY, &entry, sizeof( entry ) );
++}
++
++extern void HllP1ModuleScanned( void )
++/***********************************/
++{
++    DEBUG(( DBG_HLL, "HllP1ModuleScanned:" ));
++}
++
++#if 0 // FIXME: Implement support for non-HLL linenumbers.
++static void hllAddLines( segdata * seg, void *line, unsigned size, bool is32bit )
++/******************************************************************************/
++// called during pass 1 linnum processing
++{
++    seg = seg;
++    line = line;
++    // CurrMod->d.hll->numlines += CalcLineQty( size, is32bit );
++    size = size;
++    is32bit = is32bit;
++}
++#endif // FIXME: Implement support for non-HLL linenumbers.
++
++extern void HllP1ModuleFinished( mod_entry *obj )
++/**********************************************/
++// calculate size of the sstModule
++{
++    byte    namelen;
++
++    if( MOD_NOT_DEBUGGABLE( obj ) )
++        return;
++    CurrMod = obj;
++
++    /* assign module index */
++    obj->d.hll->modidx = ++ModIndex;
++    DEBUG(( DBG_HLL, "HllP1ModuleFinished: obj=%p %s modidx=%d offset=%h",
++            obj, obj->name.u.ptr, ModIndex, SectSizes[HLL_SECT_MODULE] ));
++
++    /* add the module subsection */
++    namelen = strlen( obj->name.u.ptr );
++    SectSizes[HLL_SECT_MODULE] += sizeof( hll_module ) + namelen;
++    hllAddSubSection();
++
++#ifdef HLL_INC_PUBLIC
++    /* add public symbols subsection */
++    Ring2Walk( obj->publist, DBIModGlobal );
++    if( obj->d.hll->pubsize > 0 ) {
++        hllAddSubSection();
++    }
++#endif
++
++#if 0 // FIXME: Implement support for non-HLL linenumbers.
++    /* add linenumber subsection for old style linenumbers */
++    if( obj->modinfo & DBI_LINE ) {
++        DBILineWalk( obj->lines, hllAddLines );
++    }
++
++    if( obj->d.cv->numlines > 0 ) {
++        unsigned_32     temp;
++
++        hllAddSubSection();
++        temp = sizeof( cheesy_module_header );
++        temp += ROUND_UP( sizeof( cheesy_file_table ) + namelen, 4 );
++        temp += sizeof( cheesy_mapping_table );
++        temp += ROUND_UP( obj->d.cv->numlines
++                    * ( sizeof( unsigned_32 ) + sizeof( unsigned_16 ) ), 4 );
++        SectSizes[HLL_SECT_MISC] += temp;
++    }
++#endif
++}
++
++extern void HllAddModule( mod_entry *obj, section *sect )
++/******************************************************/
++// called just before publics have been assigned addresses between p1 & p2
++// We generate the module entry and some other bits now.
++{
++    hll_module          mod;
++    unsigned_32         size;
++    byte                namelen;
++
++    DEBUG(( DBG_HLL, "HllAddModule: obj=%p %s sect=%p implib=%d pubsize=%h",
++            obj, obj->name.u.ptr, sect, obj->modinfo & MOD_IMPORT_LIB,
++            obj->d.hll->pubsize ));
++
++    CurrMod = obj; // paranoia
++
++    /* generate the module entry */
++    namelen = strlen( obj->name.u.ptr );
++    size = sizeof( mod ) + namelen;
++    if( obj->d.hll->numsegs ) {
++        size += ( obj->d.hll->numsegs - 1 ) * sizeof( hll_seginfo );
++    }
++    hllGenSubSection( hll_sstModules, size );
++
++    obj->d.hll->segloc = SectOffsets[HLL_SECT_MODULE];
++    mod.SegInfo.Seg     = 0;        /* corrected later if any code */
++    mod.SegInfo.offset  = 0;
++    mod.SegInfo.cbSeg   = 0;
++    mod.ovlNumber = 0;
++    mod.iLib    = 0; /// @todo add library table and indexes into it. (not important)
++    mod.cSeg    = obj->d.hll->numsegs;
++    mod.Style   = 0;
++    mod.Version = 0;
++    if( IS_OMF_DBG_HLL(obj->omfdbg) ) {
++        mod.Style = HLL_DEBUG_STYLE_HL;
++        switch( obj->omfdbg ) {
++        case OMF_DBG_HLL_03: mod.Version = 0x300; break;
++        case OMF_DBG_HLL_04: mod.Version = 0x400; break;
++        case OMF_DBG_HLL_06: mod.Version = 0x600; break;
++        }
++    }
++    mod.name_len = namelen;
++    hllDumpInfo( HLL_SECT_MODULE, &mod, sizeof( mod ) );
++    hllDumpInfo( HLL_SECT_MODULE, obj->name.u.ptr, mod.name_len );
++
++    /* next comes extra segment info structures. reserve space for them. */
++    obj->d.hll->next_segloc = SectOffsets[HLL_SECT_MODULE];
++    if( obj->d.hll->numsegs ) {
++        SectSizes[HLL_SECT_MODULE] += ( obj->d.hll->numsegs - 1 )
++                                    * sizeof( hll_seginfo );
++    }
++
++#ifdef HLL_INC_PUBLIC
++    /* publics (the callers caller will define public afterwards). */
++    if( obj->d.hll->pubsize > 0 ) {
++        hllGenSubSection( hll_sstPublics, obj->d.hll->pubsize );
++    }
++#endif
++    (void)sect; // komh: make compiler happy
++
++}
++
++#if 0 // FIXME: Implement support for non-HLL linenumbers.
++static int hllRelocCompare( virt_mem a, virt_mem b )
++/***********************************************/
++{
++    unsigned_32 a32;
++    unsigned_32 b32;
++
++    GET32INFO( a, a32 );
++    GET32INFO( b, b32 );
++    return( (signed_32)a32 - b32 );
++}
++
++static void hllSwapRelocs( virt_mem a, virt_mem b )
++/**********************************************/
++{
++    unsigned    diffa;
++    unsigned    diffb;
++    unsigned_16 a16;
++    unsigned_16 b16;
++    unsigned_32 a32;
++    unsigned_32 b32;
++
++    GET32INFO( a, a32 );
++    GET32INFO( b, b32 );
++    PUT32INFO( a, b32 );
++    PUT32INFO( b, a32 );
++    diffa = ( a - LineInfo.offbase ) / sizeof( unsigned_32 );
++    diffa *= sizeof( unsigned_16 );
++    diffa += LineInfo.numbase;
++    diffb = ( b - LineInfo.offbase ) / sizeof( unsigned_32 );
++    diffb *= sizeof( unsigned_16 );
++    diffb += LineInfo.numbase;
++    GET16INFO( diffa, a16 );
++    GET16INFO( diffb, b16 );
++    PUT16INFO( diffa, b16 );
++    PUT16INFO( diffb, a16 );
++}
++
++static void hllSortRelocs( void )
++/****************************/
++{
++    LineInfo.offbase -= CurrMod->d.hll->numlines * sizeof( unsigned_32 );
++    LineInfo.numbase -= CurrMod->d.hll->numlines * sizeof( unsigned_16 );
++    VMemQSort( LineInfo.offbase, CurrMod->d.hll->numlines, sizeof( unsigned_32 ),
++               hllSwapRelocs, hllRelocCompare );
++}
++#endif // FIXME: Implement support for non-HLL linenumbers.
++
++extern void HllGenModule( void )
++/*****************************/
++// generate an sstSrcModule
++{
++    DEBUG(( DBG_HLL, "HllGenModule: CurrMod=%p %s", CurrMod, CurrMod->name));
++#if 0 // FIXME
++    if( LineInfo.needsort ) {
++        hllSortRelocs();
++    }
++#endif
++    hllSrcModHeader();
++}
++
++extern void HllAddLocal( seg_leader *seg, offset length )
++/*******************************************************/
++// called during pass 1 final segment processing.
++{
++#if defined(HLL_INC_LINE) || defined(HLL_INC_LOCAL) || defined(HLL_INC_TYPE)
++    // 2014-05-10 SHL info -> dbgtype
++    switch( seg->dbgtype) {
++#ifdef HLL_INC_TYPE
++    case MS_TYPE:
++#endif
++#ifdef HLL_INC_LOCAL
++    case MS_LOCAL:
++#endif
++#ifdef HLL_INC_LINE
++    case HLL_LINE:
++#endif
++        DEBUG(( DBG_HLL, "HllAddLocal: seg=%h length=%d", seg, length));
++        hllAddSubSection();
++        break;
++    }
++#endif
++    (void)length; // komh: make compiler happy
++}
++
++extern void HllAddGlobal( symbol *sym )
++/************************************/
++// called during pass 1 symbol definition
++{
++#ifdef HLL_INC_PUBLIC
++    if( !( sym->info & SYM_STATIC ) ) {
++        unsigned size;
++
++        size = (byte)strlen( sym->name.u.ptr ) + sizeof(hll_public);
++        CurrMod->d.hll->pubsize += size;
++        SectSizes[HLL_SECT_MISC] += size;
++        DEBUG(( DBG_HLL, "HllAddGlobal: size=%h sym=%p %s",
++                size, sym, sym->name ));
++    }
++#endif
++    sym = sym;
++}
++
++extern void HllGenGlobal( symbol * sym, section *sect )
++/****************************************************/
++// called during symbol address calculation (between pass 1 & pass 2)
++// also called by loadpe between passes
++{
++#ifdef HLL_INC_PUBLIC
++    if( !(sym->info & SYM_STATIC) ) {
++        hll_public  pub;
++
++        DEBUG(( DBG_HLL, "HllGenGlobal: %h: sym=%p %s sect=%p",
++                SectOffsets[HLL_SECT_MISC] - HllBase, sym, sym->name, sect ));
++
++        pub.offset  = sym->addr.off;
++        pub.seg     = hllGetSegment( sym->p.seg->u.leader );
++        pub.type    = 0; /** @todo fix the public type index! */
++        pub.name_len = strlen( sym->name.u.ptr );
++        hllDumpInfo( HLL_SECT_MISC, &pub, sizeof( pub ) );
++        hllDumpInfo( HLL_SECT_MISC, sym->name.u.ptr, pub.name_len );
++    }
++#endif
++    sym = sym;
++    sect = sect;
++}
++
++static void hllSrcModHeader( void )
++/*********************************/
++// emit header for line number information now that we know where everything
++// is.
++{
++#if 0 // FIXME: Implement support for non-HLL linenumbers.
++    cheesy_module_header        mod_hdr;
++    cheesy_file_table           file_tbl;
++    cheesy_mapping_table        map_tbl;
++    unsigned                    adjust;
++    unsigned_32                 buff;
++
++    if( LineInfo.linestart == 0 )
++        return;
++    memset( &mod_hdr, 0, sizeof( mod_hdr ) );
++    mod_hdr.cFile = 1;
++    mod_hdr.cSeg = 1;
++    mod_hdr.range[0] = LineInfo.range;
++    mod_hdr.baseSrcFile[0] = sizeof( mod_hdr );
++    mod_hdr.seg[0] = LineInfo.seg;
++    mod_hdr.pad = 0;
++    PutInfo( LineInfo.linestart, &mod_hdr, sizeof( mod_hdr ) );
++    LineInfo.linestart += sizeof( mod_hdr );
++    file_tbl.cSeg = 1;
++    file_tbl.pad = 0;
++    file_tbl.range[0] = LineInfo.range;
++    file_tbl.name[0] = strlen( CurrMod->name );
++    file_tbl.baseSrcLn[0] = sizeof( mod_hdr ) +
++                    ROUND_UP( sizeof( file_tbl ) + file_tbl.name[0], 4 );
++    PutInfo( LineInfo.linestart, &file_tbl, sizeof( file_tbl ) );
++    LineInfo.linestart += sizeof( file_tbl );
++    PutInfo( LineInfo.linestart, CurrMod->name, file_tbl.name[0] );
++    LineInfo.linestart += file_tbl.name[0];
++    adjust = file_tbl.baseSrcLn[0] - sizeof( mod_hdr ) - sizeof( file_tbl )
++                - file_tbl.name[0];
++    if( adjust != 0 ) {
++        buff = 0;
++        PutInfo( LineInfo.linestart, &buff, adjust );
++        LineInfo.linestart += adjust;
++    }
++    map_tbl.Seg = mod_hdr.seg[0];
++    map_tbl.cPair = CurrMod->d.hll->numlines;
++    PutInfo( LineInfo.linestart, &map_tbl, sizeof( map_tbl ) );
++    memset( &LineInfo, 0, sizeof( LineInfo ) );
++#endif // FIXME: Implement support for non-HLL linenumbers.
++}
++
++// 2014-04-22 SHL
++// extern void HllGenLines( segdata * seg, void *lines, unsigned size, bool is32bit )
++extern void HllGenLines( lineinfo *info )
++/*******************************************************************************/
++// called during pass 2 linnum processing
++{
++    // FIXME: Implement support for non-HLL linenumbers.
++    segdata             *seg;
++    bool                is32bit;
++    unsigned            size;
++
++    seg = info->seg;
++    // lines = lines;
++    size = info->size;
++    is32bit = seg->bits == BITS_32;
++    // 2014-04-22 SHL
++    DEBUG(( DBG_HLL, "HllGenLines: info=%p seg=%p size=%d is32bit %d",
++            info, seg, size, is32bit ));
++    (void)is32bit;  // komh: make compiler happy
++    (void)size;     // komh: make compiler happy
++}
++
++static void hllAddAddrInit( segdata *sdata, void *cookie )
++/*******************************************************/
++{
++    sdata = sdata;
++    cookie = cookie;
++}
++
++static void hllAddAddrAdd( segdata *sdata, offset delta, offset size,
++                          void *cookie, bool isnewmod )
++/******************************************************************/
++{
++    delta = delta;
++    size = size;
++    cookie = cookie;
++    if( !isnewmod )
++        return;
++
++    sdata->o.mod->d.hll->numsegs++;
++}
++
++extern void HllAddAddrInfo( seg_leader *seg )
++/******************************************/
++// We take this opportunity to count seginfo structures.
++{
++    if( !( seg->info & SEG_CODE ) )
++        return;
++    DEBUG(( DBG_HLL, "HllAddAddrInfo: seg=%p %s", seg, seg->segname ));
++    DBIAddrInfoScan( seg, hllAddAddrInit, hllAddAddrAdd, NULL );
++}
++
++static void hllGenAddrInit( segdata *sdata, void *_info )
++/******************************************************/
++{
++    hll_seginfo *info = _info;
++    info->Seg = hllGetSegment( sdata->u.leader );
++    info->offset = sdata->u.leader->seg_addr.off + sdata->a.delta;
++}
++
++static void hllGenAddrAdd( segdata *sdata, offset delta, offset size,
++                          void *_info, bool isnewmod )
++/******************************************************************/
++{
++    hll_seginfo *info = _info;
++    if( !isnewmod )
++        return;
++    info->cbSeg = size;
++    PutInfo( sdata->o.mod->d.hll->segloc, info, sizeof( hll_seginfo ) );
++
++    sdata->o.mod->d.hll->segloc += sizeof( hll_seginfo );
++    info->offset = sdata->u.leader->seg_addr.off + delta;
++}
++
++extern void HllGenAddrInfo( seg_leader *seg )
++/******************************************/
++// called for each section just before pass 2 starts
++// Fill in seginfo.
++{
++    hll_seginfo info;
++
++    if( !( seg->info & SEG_CODE ) )
++        return;
++    DEBUG(( DBG_HLL, "HllGenAddrInfo: seg=%p %s", seg, seg->segname ));
++    DBIAddrInfoScan( seg, hllGenAddrInit, hllGenAddrAdd, &info );
++}
++
++extern void HllDefClass( class_entry *class, unsigned_32 size )
++/************************************************************/
++// called during address calculation for the purpose of catching
++// debug info segment classes.
++{
++#if defined(HLL_INC_LINE) || defined(HLL_INC_LOCAL) || defined(HLL_INC_TYPE)
++    group_entry *group;
++    DEBUG(( DBG_HLL, "HllDefClass: class=%p flags=%h size=%h %s", class, class->flags, size, class->name ));
++
++    switch( class->flags & CLASS_DEBUG_INFO ) {
++#ifdef HLL_INC_TYPE
++    case CLASS_MS_TYPE:
++#endif
++#ifdef HLL_INC_LOCAL
++    case CLASS_MS_LOCAL:
++#endif
++#ifdef HLL_INC_LINE
++    case CLASS_HLL_LINE:
++#endif
++        /* add the class to the DBI groups (we'll traverse them later) */
++        group = AllocGroup( AutoGrpName, &DBIGroups );
++        group->g.class = class;
++        group->grp_addr.seg = 0;
++
++        DEBUG(( DBG_HLL, "HllDefClass: class=%p %s group=%p flags=%h "
++                "offset=%h size=%h", class, class->name, group,
++                class->flags, SectSizes[HLL_SECT_MISC], size ));
++        SectSizes[HLL_SECT_MISC] += size;
++        break;
++    }
++#endif
++}
++
++static void hllDefSegData( void *_sdata )
++/**********************************/
++// Creates a Type or Symbol subsection for a module and copies the data into it.
++/* NOTE: this assumes that codeview segments are byte aligned! */
++{
++    segdata    *sdata = _sdata;
++    seg_leader *leader = sdata->u.leader;
++
++    DEBUG(( DBG_HLL, "hllDefSegData: iMod=%d length=%h align=2**%d isdead=%d dbgtype=%h",
++            sdata->o.mod->d.hll->modidx, sdata->length, sdata->align, sdata->isdead, leader->dbgtype ));
++
++    if( !sdata->isdead ) {
++        hll_sst sect;
++
++        switch ( leader->dbgtype ) {
++#ifdef HLL_INC_TYPE
++        case MS_TYPE:   sect = hll_sstTypes;   break;
++#endif
++#ifdef HLL_INC_LOCAL
++        case MS_LOCAL:  sect = hll_sstSymbols; break;
++#endif
++#ifdef HLL_INC_LINE
++        case HLL_LINE:  sect = hll_sstHLLSrc;  break;
++#endif
++        default:
++            return;
++        }
++#if defined(HLL_INC_LINE) || defined(HLL_INC_LOCAL) || defined(HLL_INC_TYPE)
++        CurrMod = sdata->o.mod;
++        DEBUG(( DBG_HLL, "hllDefSegData: %h: iMod=%d sect=%d length=%h align=2**%d %s",
++                SectOffsets[HLL_SECT_MISC] - HllBase, CurrMod->d.hll->modidx, sect, sdata->length,
++                sdata->align, CurrMod->name ));
++
++        hllGenSubSection( sect, sdata->length );
++        CopyInfo( SectOffsets[HLL_SECT_MISC], sdata->u1.vm_ptr, sdata->length );
++        sdata->u1.vm_ptr = SectOffsets[HLL_SECT_MISC];   // FIXME: inefficient
++        SectOffsets[HLL_SECT_MISC] += sdata->length;
++#endif
++    }
++}
++
++static bool hllDefLeader( void *_leader, void *group )
++/*************************************************/
++{
++    seg_leader *leader = _leader;
++    DEBUG((DBG_HLL, "hllDefLeader: leader=%p %s", leader, leader->segname ));
++
++    leader->group = group;
++    RingWalk( leader->pieces, hllDefSegData );
++    return( false );
++}
++
++extern void HllAddrStart( void )
++/*****************************/
++// called after address calculation is done.
++{
++    hll_dirinfo         dirhdr;
++    hll_trailer         start;
++    virt_mem            currpos;
++    int                 index;
++    group_entry        *group;
++    DEBUG((DBG_HLL, "HllAddrStart" ));
++
++    /* calc the debug info size */
++    SectSizes[HLL_SECT_DIRECTORY] += sizeof( dirhdr );
++    HllSize = 2 * sizeof( start );
++    for( index = 0; index < NUM_HLL_SECTS; index++ ) {
++        HllSize += SectSizes[index];
++    }
++
++    /* Allocate memory for the debug info. */
++    HllBase = DBIAlloc( HllSize );
++
++    /* calc the position of the section. */
++    currpos = HllBase + sizeof( start );
++    for( index = 0; index < NUM_HLL_SECTS; index++ ) {
++        DEBUG (( DBG_HLL, "HllAddrStart: %d: off=%h size=%h",
++                 index, currpos - HllBase, SectSizes[index] ));
++        SectOffsets[index] = currpos;
++        currpos += SectSizes[index];
++#ifdef HLL_DEBUG
++        memset( (void *)SectOffsets[index], '0' + index, SectSizes[index] ); /* fill */
++#endif
++    }
++
++    /* write the NB04 signatures */
++    memcpy( start.sig, HLL_NB04, sizeof( start.sig ) );
++    start.offset = SectOffsets[HLL_SECT_DIRECTORY] - HllBase;
++    PutInfo( HllBase, &start, sizeof( start ) );
++    start.offset = HllSize;
++    PutInfo( HllBase + HllSize - sizeof( start ), &start, sizeof( start ) );
++
++    /* write the subsection directory header (also called directory info) */
++    HllDirHdr = (hll_dirinfo *)SectOffsets[HLL_SECT_DIRECTORY];
++    dirhdr.cbDirHeader = sizeof( dirhdr );
++    dirhdr.cbDirEntry = sizeof( hll_dir_entry );
++    dirhdr.cDir = (SectSizes[HLL_SECT_DIRECTORY] - sizeof( dirhdr )) / sizeof( hll_dir_entry );
++    hllDumpInfo( HLL_SECT_DIRECTORY, &dirhdr, sizeof( dirhdr ) );
++
++    /* Walk the debug info groups and dump the data in those segments. */
++    for( group = DBIGroups; group != NULL; group = group->next_group ) {
++        RingLookup( group->g.class->segs, hllDefLeader, group );
++        group->g.class = NULL;
++    }
++}
++
++extern void HllFini( section *sect )
++/*********************************/
++// called after pass 2 is finished, but before load file generation
++{
++    DEBUG(( DBG_HLL, "HllFini: sect=%p", sect ));
++    (void)sect; // komh: make compiler happy
++}
++
++extern void HllWriteDBI( void )
++/****************************/
++// called during load file generation.  It is assumed that the loadfile is
++// positioned to the right spot.
++{
++    unsigned        i, j;
++    hll_dir_entry  *dir_entries;
++
++    DEBUG(( DBG_HLL, "HllWriteDBI: HllBase=%h HllSize=%h", HllBase, HllSize ));
++
++    /* before writing it sort the directory by module. */
++    dir_entries = (hll_dir_entry *)(HllDirHdr + 1);
++    for( i = 0; i < HllDirHdr->cDir; i++ ) {
++        for( j = i + 1; j < HllDirHdr->cDir; j++ ) {
++            if(     dir_entries[j].iMod < dir_entries[i].iMod
++                ||  (   dir_entries[j].iMod == dir_entries[i].iMod
++                     && dir_entries[j].subsection < dir_entries[i].subsection ) ) {
++                hll_dir_entry tmp = dir_entries[j];
++                dir_entries[j] = dir_entries[i];
++                dir_entries[i] = tmp;
++            }
++        }
++    }
++
++    /* write the debug section */
++    WriteInfoLoad( HllBase, HllSize );
++}
+diff --git a/bld/wl/c/obj2supp.c b/bld/wl/c/obj2supp.c
+index 6ab6e5d21b..ec95ebf25b 100644
+--- a/bld/wl/c/obj2supp.c
++++ b/bld/wl/c/obj2supp.c
+@@ -979,6 +979,9 @@ static offset FindRealAddr( fix_relo_data *fix )
+ 
+     off = fix->tgt_addr.off;
+     dbiflat = DBINoReloc( CurrRec.seg->u.leader );
++    if ( CurrRec.seg->u.leader->dbgtype == HLL_LINE ) { // FIXME! DBINoReloc() abuse here?
++        dbiflat = false;
++    }
+     if( (fix->type & FIX_ABS)
+         || dbiflat && (CurrMod->modinfo & MOD_FLATTEN_DBI) == 0 ) {
+         return( off );
+@@ -1106,7 +1109,8 @@ static void PatchData( fix_relo_data *fix )
+         }
+ #endif
+         if( fix->done || (FmtData.type & (MK_QNX | MK_DOS)) ) {
+-            if( isdbi && (LinkFlags & LF_CV_DBI_FLAG) ) {    // FIXME
++            if( isdbi && (LinkFlags & (LF_CV_DBI_FLAG | LF_HLL_DBI_FLAG) ) ) {    // FIXME
++
+                 segval = FindGroupIdx( fix->tgt_addr.seg );
+             } else if( fix->type & FIX_ABS ) {
+                 /* MASM 5.1 stuffs abs seg length in displacement; ignore it like LINK. */
+diff --git a/bld/wl/c/objomf.c b/bld/wl/c/objomf.c
+index 60b52dd5ab..392fd4cf09 100644
+--- a/bld/wl/c/objomf.c
++++ b/bld/wl/c/objomf.c
+@@ -32,6 +32,7 @@
+ 
+ #include <string.h>
+ #include "linkstd.h"
++#include "specials.h"
+ #include "pcobj.h"
+ #include "obj2supp.h"
+ #include "objnode.h"
+@@ -233,18 +234,26 @@ static void DoMSOMF( void )
+     if( ObjBuff == EOObjRec ) {
+         CurrMod->omfdbg = OMF_DBG_CODEVIEW;    /* Assume MS style */
+     } else {
+-//        unsigned_8  version;
++        unsigned_8 version;
+ 
+-        /* version = * */ ObjBuff++;
++        version = *ObjBuff++;
+         if( ObjBuff[0] == 'C'
+           && ObjBuff[1] == 'V' ) {
+             CurrMod->omfdbg = OMF_DBG_CODEVIEW;
+         } else if( ObjBuff[0] == 'H'
+           && ObjBuff[1] == 'L' ) {
+-            CurrMod->omfdbg = OMF_DBG_HLL;
++            switch( version ) {
++            case 3: CurrMod->omfdbg = OMF_DBG_HLL_03; break;
++            case 4: CurrMod->omfdbg = OMF_DBG_HLL_04; break;
++            case 6: CurrMod->omfdbg = OMF_DBG_HLL_06; break;
++            default:
++                CurrMod->omfdbg = OMF_DBG_UNKNOWN;
++                break;
++            }
+         } else {
+             CurrMod->omfdbg = OMF_DBG_UNKNOWN;
+         }
++        ObjBuff += 2;
+     }
+ }
+ 
+@@ -714,6 +723,21 @@ static void ProcLinnum( void )
+     DBIAddLines( seg->entry, ObjBuff, EOObjRec - ObjBuff, is32bit );
+ }
+ 
++static void EnumFindLinesSeg( void *_seg, void *_result_seg )
++/****************************/
++{
++    segnode **result_seg = (segnode **)_result_seg;
++    segnode *seg = _seg;
++
++    if (    seg->entry->bits == BITS_32
++        &&  !seg->entry->align
++        &&  !seg->entry->iscode
++        &&  !strcmp( seg->entry->u.leader->segname.u.ptr, "$$LINES" )
++        /* FIXME: compare class? */) {
++        *result_seg = seg;
++    }
++}
++
+ static byte *ProcIDBlock( virt_mem *dest, byte *buffer, unsigned_32 iterate )
+ /****************************************************************************
+  * Process logically iterated data blocks.
+@@ -843,6 +867,95 @@ static void ProcLxdata( bool islidata )
+     GetObject( seg->entry, obj_offset, islidata );
+ }
+ 
++static void ProcHllLinnum( void )
++/****************************/
++// Because HLL have FIXUPs to the LINNUM records we treat it as
++// a LEDATA record for a special $$LINES segment.
++// The leading group & segment indexes doesn't figure in
++// the 'LEDATA' - at least not for HLL v4.
++// FIXME: check what the LINNUM records looks like in the other HLL versions!
++{
++    static unsigned_32 HllLineNumOffset;
++    segnode *   seg;
++    unsigned_32 obj_offset;
++
++    if( !(LinkFlags & LF_HLL_DBI_FLAG) )
++        return;
++
++    /* find the $$LINES segment, create it if not found with this module. */
++    seg = NULL;
++    IterateNodelist( SegNodes, EnumFindLinesSeg, &seg );
++    if (!seg) {
++        segdata *           sdata;
++        segnode *           snode;
++        omf_record *        rec;
++        unsigned_32         loc;
++        unsigned_32         loc_1st_linnum;
++        unsigned_32         len_1st_linnum;
++        byte *              buf;
++
++        sdata = AllocSegData();
++        sdata->u.name.u.ptr  = "$$LINES";
++        sdata->combine = COMBINE_ADD;
++        sdata->align   = 0;
++        sdata->bits = BITS_32;
++        sdata->iscode  = false;
++
++        /* This is EXTEREMLY UGLY! Sorry about that.
++         * But, we need to get the segment size right when defining
++         * the segment if I understand the code correctly. Since
++         * there is only this pass thru the object file, we have to
++         * cook our own pass here so we can count up the LINNUM
++         * bits.
++         * We assume we're in the very first LINNUM record.
++         */
++        loc_1st_linnum = -1;
++        len_1st_linnum = 0; /* komh */
++        loc = CurrMod->location;
++        DEBUG(( DBG_HLL, "ProcHllLinnum: counting LINNUM data for %s", CurrMod->name ));
++        do {
++            rec = CacheRead( CurrMod->f.source, loc, sizeof( *rec ) );
++            if (!rec) {
++                break;
++            }
++            if ( rec->command == CMD_LINNUM32 || rec->command == CMD_LINNUM ) {
++                if ( !sdata->length ) {
++                    loc_1st_linnum = loc + sizeof( *rec );
++                    len_1st_linnum = rec->length;
++                }
++                DEBUG(( DBG_HLL, "ProcHllLinnum: %h: +%h", loc, rec->length - 3 ));
++                sdata->length += rec->length - 3; /* 0 grp idx, 0 seg idx, crc */
++            }
++            loc += rec->length + sizeof( omf_record );
++        } while ( rec->command != CMD_MODEND && rec->command != CMD_MODE32 );
++
++        /* get the current record from the cache */
++        buf = CacheRead( CurrMod->f.source, loc_1st_linnum, len_1st_linnum );
++        if ( buf != ObjBuff ) {
++            EOObjRec = buf + len_1st_linnum - 1;
++            ObjBuff = buf;
++        }
++
++        snode = AllocNode( SegNodes );
++        snode->entry = sdata;
++        AllocateSegment( snode, _HllLineClass );
++
++        HllLineNumOffset = 0;
++        IterateNodelist( SegNodes, EnumFindLinesSeg, &seg );
++    }
++
++    SkipIdx(); // group idx (0)
++    SkipIdx(); // segment idx (ignored)
++
++    /* Do like ProcLxData */
++    obj_offset = HllLineNumOffset;
++    DEBUG(( DBG_HLL, "ProcHllLinnum: HllLineNumOffset=%h length=%h", HllLineNumOffset, EOObjRec - ObjBuff ));
++    HllLineNumOffset += EOObjRec - ObjBuff;
++   seg->entry->u.leader->info |= SEG_LXDATA_SEEN;
++    seg->info |= SEG_LXDATA_SEEN;
++    GetObject( seg->entry, obj_offset, false );
++}
++
+ static void LinkDirective( void )
+ /*******************************/
+ {
+@@ -1020,6 +1133,8 @@ static void Pass1Cmd( byte cmd )
+     case CMD_LINNUM:
+         if( CurrMod->omfdbg == OMF_DBG_CODEVIEW )
+             ProcLinnum();
++        else if ( IS_OMF_DBG_HLL( CurrMod->omfdbg ) )
++            ProcHllLinnum();
+         break;
+     case CMD_LINS32:
+         ObjFormat |= FMT_MS_386;
+diff --git a/bld/wl/h/dbghll.h b/bld/wl/h/dbghll.h
+new file mode 100644
+index 0000000000..78ded8d308
+--- /dev/null
++++ b/bld/wl/h/dbghll.h
+@@ -0,0 +1,49 @@
++/****************************************************************************
++*
++*                            Open Watcom Project
++*
++*    Portions Copyright (c) 1983-2002 Sybase, Inc. All Rights Reserved.
++*
++*  ========================================================================
++*
++*    This file contains Original Code and/or Modifications of Original
++*    Code as defined in and that are subject to the Sybase Open Watcom
++*    Public License version 1.0 (the 'License'). You may not use this file
++*    except in compliance with the License. BY USING THIS FILE YOU AGREE TO
++*    ALL TERMS AND CONDITIONS OF THE LICENSE. A copy of the License is
++*    provided with the Original Code and Modifications, and is also
++*    available at www.sybase.com/developer/opensource.
++*
++*    The Original Code and all software distributed under the License are
++*    distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
++*    EXPRESS OR IMPLIED, AND SYBASE AND ALL CONTRIBUTORS HEREBY DISCLAIM
++*    ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF
++*    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR
++*    NON-INFRINGEMENT. Please see the License for the specific language
++*    governing rights and limitations under the License.
++*
++*  ========================================================================
++*
++* Description:  routines for producing HLL debug information in the load file
++*
++****************************************************************************/
++
++
++extern void     HllInit( void );
++extern void     HllInitModule( mod_entry * );
++extern void     HllP1ModuleScanned( void );
++extern void     HllP1ModuleFinished( mod_entry * );
++extern void     HllAddModule( mod_entry *, section * );
++extern void     HllGenModule( void );
++extern void     HllAddLocal( seg_leader *, offset );
++extern void     HllAddGlobal( symbol * );
++extern void     HllGenGlobal( symbol *, section * );
++extern void     HllGenLines( lineinfo * ); // 2014-04-22 SHL
++extern void     HllAddAddrInfo( seg_leader * );
++extern void     HllGenAddrInfo( seg_leader * );
++extern void     HllAddrStart( void );
++extern void     HllDefClass( class_entry *, unsigned_32 );
++extern void     HllFini( section * );
++extern void     HllWriteDBI( void );
++
++//extern unsigned_32      HllSize;- loadpe.c?
+diff --git a/bld/wl/h/debug.h b/bld/wl/h/debug.h
+index 9f21c60f6d..40aa45b6e5 100644
+--- a/bld/wl/h/debug.h
++++ b/bld/wl/h/debug.h
+@@ -42,6 +42,7 @@
+ #define DBG_VIRTMEM     0x10
+ #define DBG_DEADCODE    0x20
+ #define DBG_DBGINFO     0x40
++#define DBG_HLL         0x80
+ #define DBG_NOCRLF      0x8000
+ #define DBG_INFO_MASK   0x7FFF
+ 
+diff --git a/bld/wl/h/link.h b/bld/wl/h/link.h
+index 8d12cbd08a..520fba3bce 100644
+--- a/bld/wl/h/link.h
++++ b/bld/wl/h/link.h
+@@ -55,11 +55,13 @@ typedef enum {
+     LF_NOCACHE_FLAG         = 0x00100000,
+     LF_CACHE_FLAG           = 0x00200000,
+     LF_FAR_CALLS_FLAG       = 0x00400000,   // optimize far calls
++    LF_HLL_DBI_FLAG         = 0x00800000,   // write HLL debug Info.
++    LF_HLLPACK_FLAG         = 0x01000000,   // pack HLL debug info.
+ } linkflag;
+ 
+ // Novell treated differently, as it can be generated at the same time as the others.
+ 
+-#define LF_ANY_DBI_FLAG     (LF_DWARF_DBI_FLAG | LF_CV_DBI_FLAG | LF_OLD_DBI_FLAG)
++#define LF_ANY_DBI_FLAG     (LF_DWARF_DBI_FLAG | LF_CV_DBI_FLAG | LF_OLD_DBI_FLAG | LF_HLL_DBI_FLAG)
+ 
+ typedef enum {
+     MAP_FLAG                = 0x0001,
+diff --git a/bld/wl/h/objstruc.h b/bld/wl/h/objstruc.h
+index a49edc1251..6b95e92c58 100644
+--- a/bld/wl/h/objstruc.h
++++ b/bld/wl/h/objstruc.h
+@@ -247,14 +247,19 @@ typedef struct obj_name_list {
+ typedef struct odbimodinfo      ODBIMODINFO;    // defd in dbg information hdrs
+ typedef struct dwarfmodinfo     DWARFMODINFO;
+ typedef struct cvmodinfo        CVMODINFO;
++typedef struct hllmodinfo       HLLMODINFO;
+ 
+ // OMF debug information formats
+ typedef enum {
+     OMF_DBG_UNKNOWN,
+     OMF_DBG_CODEVIEW,
+-    OMF_DBG_HLL
++    OMF_DBG_HLL_03,
++    OMF_DBG_HLL_04,
++    OMF_DBG_HLL_06
+ } omf_dbg_type;
+ 
++#define IS_OMF_DBG_HLL(omfdbg) ( (omfdbg) >= OMF_DBG_HLL_03 && (omfdbg) <= OMF_DBG_HLL_06 )
++
+ typedef struct mod_entry {
+     union {
+         MOD_ENTRY       *next_mod;  // regular next pointer
+@@ -282,6 +287,7 @@ typedef struct mod_entry {
+         ODBIMODINFO     *o;
+         DWARFMODINFO    *d;
+         CVMODINFO       *cv;
++        HLLMODINFO      *hll;
+     } d;                        // union used for debugging information
+ } mod_entry;
+ 
+@@ -298,9 +304,10 @@ typedef enum {
+     CLASS_FIXED         = 0x1000,   // Class should load at specified address
+     CLASS_COPY          = 0x2000,   // Class should use data from DupClass
+     CLASS_NOEMIT        = 0x4000,   // Class should not generate output
++    CLASS_HLL_LINE      = 0x8000,   // HLL Line Number (debug info)
+ } class_status;
+ 
+-#define CLASS_DEBUG_INFO    (CLASS_MS_TYPE | CLASS_MS_LOCAL | CLASS_DWARF)
++#define CLASS_DEBUG_INFO    (CLASS_MS_TYPE | CLASS_MS_LOCAL | CLASS_DWARF | CLASS_HLL_LINE)
+ 
+ #define EMIT_CLASS(c)       (((c)->flags & CLASS_NOEMIT) == 0)
+ 
+@@ -367,7 +374,7 @@ typedef struct seg_leader {
+     SEG_LEADER          *DupSeg;            // Segment to get data from for output
+     unsigned_16         info;
+     unsigned_16         align   : 5;        // alignment of seg (power of 2)
+-    unsigned_16         dbgtype : 3;        // debugging type of seg
++    unsigned_16         dbgtype : 4;        // debugging type of seg
+     unsigned_16         combine : 2;        // combine val. of seg
+     unsigned_32         num;                // # of addrinfos to output (video)
+     targ_addr           seg_addr;           // address of segment.
+@@ -429,7 +436,8 @@ enum {
+     DWARF_DEBUG_ABBREV  = 0x0004,
+     DWARF_DEBUG_LINE    = 0x0005,
+     DWARF_DEBUG_ARANGE  = 0x0006,
+-    DWARF_DEBUG_OTHER   = 0x0007
++    DWARF_DEBUG_OTHER   = 0x0007,
++    HLL_LINE            = 0x0008    /* IBM HLL line numbers. */
+ };
+ 
+ enum {
+diff --git a/bld/wl/h/specials.h b/bld/wl/h/specials.h
+index 742394c221..fd6e9a6190 100644
+--- a/bld/wl/h/specials.h
++++ b/bld/wl/h/specials.h
+@@ -57,6 +57,7 @@ SPECIAL( ConstClassName,        "CONST" );
+ SPECIAL( TLSClassName,          "TLS" );
+ SPECIAL( _MSTypeClass,          "DEBTYP" );
+ SPECIAL( _MSLocalClass,         "DEBSYM" );
++SPECIAL( _HllLineClass,         "DEBHLLLINE" );
+ SPECIAL( _DwarfClass,           "DWARF" );
+ SPECIAL( CoffIDataClassName,    ".idata" );
+ 
+diff --git a/bld/wl/h/wlbanner.h b/bld/wl/h/wlbanner.h
+index 9ecca5916c..0e6ebc5c16 100644
+--- a/bld/wl/h/wlbanner.h
++++ b/bld/wl/h/wlbanner.h
+@@ -32,6 +32,8 @@
+ 
+ #if 0
+     #define IDV     "** EXPERIMENTAL ** "
++#elif 1
++    #define IDV     "** EXPERIMENTAL (HLL) ** "
+ #elif defined( DEVBUILD )
+     #define IDV     "**INTERNAL DEVELOPMENT** "
+ #else
+diff --git a/bld/wl/res/wlink.msg b/bld/wl/res/wlink.msg
+index a59241e319..cdc69848f7 100644
+--- a/bld/wl/res/wlink.msg
++++ b/bld/wl/res/wlink.msg
+@@ -212,8 +212,8 @@ pick( MSG_GENERAL_HELP_28,  "            | \"MODFile\"      obj_file{\",\"obj_fi
+                             "            | \"MODFile\"      オブジェクトファイル{\",\"オブジェクトファイル}" )
+ pick( MSG_GENERAL_HELP_29,  "obj_spec  ::= obj_file[\"(\"obj_member\")\"] | library_file[\"(\"lib_member\")\"]" ,
+                             "obj_spec  ::= オブジェクトファイル[\"(\"オブジェクトメンバー\")\"] | ライブラリファイル[\"(\"ライブラリメンバー\")\"]")
+-pick( MSG_GENERAL_HELP_30,  "dbtype    ::= \"Watcom\" | \"Dwarf\" | \"Codeview\"",
+-                            "dbtype    ::= \"Watcom\" | \"Dwarf\" | \"Codeview\"")
++pick( MSG_GENERAL_HELP_30,  "dbtype    ::= \"Watcom\" | \"Dwarf\" | \"Codeview\" | \"Hll\"" ,
++                            "dbtype    ::= \"Watcom\" | \"Dwarf\" | \"Codeview\" | \"Hll\"" )
+ pick( MSG_GENERAL_HELP_31,  "dblist    ::= dboption{\",\"dboption}" ,
+                             "dblist    ::= dboption{\",\"dboption}")
+ pick( MSG_GENERAL_HELP_32,  "dboption  ::= \"LInes\" | \"Types\" | \"LOcals\" | \"All\"" ,
+@@ -232,9 +232,9 @@ pick( MSG_GENERAL_HELP_38,  "            | \"[NO]REDefsok\" | \"STack\"=n | \"ST
+                             "            | \"[NO]REDefsok\" | \"STack\"=n | \"START=\"シンボル名 | \"STATics\"" )
+ pick( MSG_GENERAL_HELP_39,  "            | \"SYMFile\"[\"=\"symbol_file], | \"[NO]Undefsok\" | \"Verbose\"",
+                             "            | \"SYMFile\"[\"=\"シンボルファイル], | \"[NO]Undefsok\" | \"Verbose\"" )
+-pick( MSG_GENERAL_HELP_40,  "            | \"VFRemoval\"" ,
+-                            "            | \"VFRemoval\"" )
+-                
++pick( MSG_GENERAL_HELP_40,  "            | \"VFRemoval\" | \"HLLPack\"" ,
++                            "            | \"VFRemoval\" | \"HLLPack\"" )
++
+ /*
+  *  Dos help screen: max 16 lines (from 0 to 15).
+  *  To start a new page, leave a line undefined or define an empty line.
+diff --git a/bld/wl/wlobjs.mif b/bld/wl/wlobjs.mif
+index 25afb7f682..dc5f36a56e 100644
+--- a/bld/wl/wlobjs.mif
++++ b/bld/wl/wlobjs.mif
+@@ -41,6 +41,7 @@ common_objs = &
+     $(_subdir_)cmdqnx.obj &
+     $(_subdir_)dbgall.obj &
+     $(_subdir_)dbgcv.obj &
++    $(_subdir_)dbghll.obj &
+     $(_subdir_)dbgdwarf.obj &
+     $(_subdir_)dbginfo.obj &
+     $(_subdir_)debug.obj &
+diff --git a/bld/wstrip/c/strip.c b/bld/wstrip/c/strip.c
+index ca29c4c80e..fd6f352c82 100644
+--- a/bld/wstrip/c/strip.c
++++ b/bld/wstrip/c/strip.c
+@@ -47,6 +47,7 @@
+ #include "machtype.h"
+ #include "wdbginfo.h"
+ #include "cv4.h"
++#include "hll.h"
+ #include "tistrail.h"
+ #include "wstrip.h"
+ #include "wressetr.h"
+@@ -219,7 +220,8 @@ static bool TryCV4( FILE *fp, info_info *info )
+     if( memcmp( head.sig, CV4_NB09, sizeof( head.sig ) ) != 0
+       && memcmp( head.sig, CV4_NB08, sizeof( head.sig ) ) != 0
+       && memcmp( head.sig, CV4_NB07, sizeof( head.sig ) ) != 0
+-      && memcmp( head.sig, CV4_NB05, sizeof( head.sig ) ) != 0 ) {
++      && memcmp( head.sig, CV4_NB05, sizeof( head.sig ) ) != 0
++      && memcmp( head.sig, HLL_NB04, sizeof( head.sig ) ) != 0 ) {
+         return( false );
+     }
+     info->len = head.offset;
+-- 
+2.28.0
+
