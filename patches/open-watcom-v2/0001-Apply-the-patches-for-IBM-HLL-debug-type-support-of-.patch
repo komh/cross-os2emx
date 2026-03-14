@@ -1,4 +1,4 @@
-From 0652b4729e427180764dcddd40a4febfc05fa22d Mon Sep 17 00:00:00 2001
+From daa6ee441918d70e04446c1d03a47502ff28d1ba Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sat, 14 Mar 2026 18:47:20 +0900
 Subject: [PATCH] Apply the patches for IBM HLL debug type support of v1.9 to
@@ -11,7 +11,7 @@ Subject: [PATCH] Apply the patches for IBM HLL debug type support of v1.9 to
  bld/dip/hllcv/c/hllmod.c   |  18 +-
  bld/dip/hllcv/c/hllsym.c   |   7 +-
  bld/dip/hllcv/h/hllinfo.h  |   3 +-
- bld/exedump/c/dumphll.c    | 530 ++++++++++++++++++++++---
+ bld/exedump/c/dumphll.c    | 525 ++++++++++++++++++++++---
  bld/watcom/h/hll.h         |  26 +-
  bld/wl/c/cmdall.c          |  21 +
  bld/wl/c/dbgall.c          |  42 +-
@@ -28,7 +28,7 @@ Subject: [PATCH] Apply the patches for IBM HLL debug type support of v1.9 to
  bld/wl/res/wlink.msg       |  10 +-
  bld/wl/wlobjs.mif          |   1 +
  bld/wstrip/c/strip.c       |   4 +-
- 23 files changed, 1552 insertions(+), 88 deletions(-)
+ 23 files changed, 1547 insertions(+), 88 deletions(-)
  create mode 100644 bld/wl/c/dbghll.c
  create mode 100644 bld/wl/h/dbghll.h
 
@@ -74,7 +74,7 @@ index cd72b3ce26..eeafd2e583 100644
          }
      }
 diff --git a/bld/dip/hllcv/c/hllmod.c b/bld/dip/hllcv/c/hllmod.c
-index f5c9777ed7..ff3083a043 100644
+index f5c9777ed7..f660a31695 100644
 --- a/bld/dip/hllcv/c/hllmod.c
 +++ b/bld/dip/hllcv/c/hllmod.c
 @@ -146,21 +146,22 @@ size_t DIPIMPENTRY( ModName )( imp_image_handle *iih, imp_mod_handle imh,
@@ -113,7 +113,7 @@ index f5c9777ed7..ff3083a043 100644
 -    if( cuinfo != NULL ) {
 -        switch( cuinfo->language ) {
 +    // 2023-11-18 SHL correct hll_ssr_cu_info typo
-+    hll_ssr_cu_info *cu_info = GetCompInfo( ii, im );
++    hll_ssr_cu_info *cu_info = hllGetCompInfo( ii, im );
 +    if( cu_info != NULL ) {
 +        switch( cu_info->language ) {
          case HLL_LANG_C:        return( FE_LANG_C );
@@ -159,7 +159,7 @@ index b6a2fb4e09..70ea7336bb 100644
  
  #define T_CODE_LBL16    0x00f01
 diff --git a/bld/exedump/c/dumphll.c b/bld/exedump/c/dumphll.c
-index 6df1371203..482c571c95 100644
+index 6df1371203..e74fe9f654 100644
 --- a/bld/exedump/c/dumphll.c
 +++ b/bld/exedump/c/dumphll.c
 @@ -41,6 +41,10 @@
@@ -173,35 +173,16 @@ index 6df1371203..482c571c95 100644
  static  const_string_table hll_dir_info_msg[] = {
      "2cbDirHeader - length of directory header      = ",
      "2cbDirEntry  - lentgh of each entry            = ",
-@@ -109,6 +113,7 @@ static  const_string_table cv_dir_entry_msg[] = {
+@@ -127,7 +131,7 @@ static  const_string_table cv_seg_msg[] = {
      NULL
  };
- 
-+#if 0   // komh: not used currently
- static  const_string_table cv_sstModules_msg[] = {
-     "2  Seg          - segment index                = ",
-     "2  Off          - code start within segment    = ",
-@@ -119,15 +124,18 @@ static  const_string_table cv_sstModules_msg[] = {
-     "1  reserved     - padding                      = ",
-     NULL
- };
-+#endif
- 
-+#if 0   // komh: not used currently
- static  const_string_table cv_seg_msg[] = {
-     "2    Seg      - segment index                  = ",
-     "2    Off      - code start within segment      = ",
-     "2    cbSeg    - size of code in segment        = ",
-     NULL
- };
-+#endif
  
 -#if 0 /* not currently used, code is broken. */
 +// 2021-09-18 SHL Restored
  static  const_string_table hl4_linnum_first_msg[] = {
      "2  line        - line number (must be zero)     = ",
      "1  entryType   - format of entry                = ",
-@@ -145,6 +153,7 @@ static  const_string_table hl4_filetab_entry_msg[] = {
+@@ -145,6 +149,7 @@ static  const_string_table hl4_filetab_entry_msg[] = {
      NULL
  };
  
@@ -209,7 +190,7 @@ index 6df1371203..482c571c95 100644
  static  const_string_table hl3_linnum_first_msg[] = {
      "2  line        - line number (must be zero)     = ",
      "1  entry_type  - format of entry                = ",
-@@ -161,6 +170,7 @@ static  const_string_table hl3_filetab_entry_msg[] = {
+@@ -161,6 +166,7 @@ static  const_string_table hl3_filetab_entry_msg[] = {
      "4  numFiles   - number of files in table       = ",
      NULL
  };
@@ -217,7 +198,7 @@ index 6df1371203..482c571c95 100644
  
  static  const_string_table hll_linnum_entry_msg[] = {
      "2    line     - line number                    = ",
-@@ -168,7 +178,6 @@ static  const_string_table hll_linnum_entry_msg[] = {
+@@ -168,7 +174,6 @@ static  const_string_table hll_linnum_entry_msg[] = {
      "4    offset   - offset within segment          = ",
      NULL
  };
@@ -225,7 +206,7 @@ index 6df1371203..482c571c95 100644
  
  static  int     hll_level;
  
-@@ -210,7 +219,9 @@ static void dump_hll_sstPublics( unsigned_32 base, unsigned_32 offset,
+@@ -210,7 +215,9 @@ static void dump_hll_sstPublics( unsigned_32 base, unsigned_32 offset,
      unsigned_32         read;
  
      Wlseek( base + offset );
@@ -236,7 +217,7 @@ index 6df1371203..482c571c95 100644
      Puthex( offset, 8 );
      Wdputslc( "\n" );
      for( read = 0; read < size; read += sizeof( pub32 ) + pub32.name_len ) {
-@@ -281,6 +292,7 @@ static void dump_cv_sstTypes( unsigned_32 base, unsigned_32 offset,
+@@ -281,6 +288,7 @@ static void dump_cv_sstTypes( unsigned_32 base, unsigned_32 offset,
      Wdputslc( "\n" );
  }
  
@@ -244,12 +225,12 @@ index 6df1371203..482c571c95 100644
  /*
   * dump_cv_sstSymbols - dump CV sstSymbols at 'offset'
   * from 'base 'containing 'size' bytes
-@@ -400,7 +412,413 @@ static void dump_cv_sstSymbols( unsigned_32 base, unsigned_32 offset,
+@@ -400,7 +408,413 @@ static void dump_cv_sstSymbols( unsigned_32 base, unsigned_32 offset,
      }
      Wdputslc( "\n" );
  }
 +#endif // FIXME to be gone
- 
++
 +/*
 + * put_name - output string with single byte length prefix
 + * @param p is pointer to name length prefix
@@ -265,7 +246,7 @@ index 6df1371203..482c571c95 100644
 +    fprintf( stdout, "%.*s", len, p );
 +    return p + len;
 +}
-+
+ 
 +/*
 + * put_name2 - output string with encoded length prefix
 + * @param p is pointer to name length prefix
@@ -658,23 +639,18 @@ index 6df1371203..482c571c95 100644
  
  /*
   * dump_cv_sstLibraries - dump CV sstLibraries at 'offset'
-@@ -430,6 +848,7 @@ static void dump_cv_sstLibraries( unsigned_32 base, unsigned_32 offset,
- }
+@@ -474,7 +888,9 @@ static void dump_hll_sstModules( unsigned_32 base, unsigned_32 offset )
+     bool                first = true;
  
- 
-+#if 0   // komh: not used currently
- /*
-  * dump_cv_sstModules - dump CV sstModules at 'offset' from 'base'
-  */
-@@ -461,6 +880,7 @@ static void dump_cv_sstModules( unsigned_32 base, unsigned_32 offset )
-     }
+     Wlseek( base + offset );
+-    Wdputs( "==== sstModules at offset " );
++    Wdputs( "==== sstModules (" );
++    Puthex( hll_sstModules, 3 );
++    Wdputs( "H) at offset " );
+     Puthex( offset, 8 );
      Wdputslc( "\n" );
- }
-+#endif
- 
- 
- /*
-@@ -532,49 +952,54 @@ static void dump_hll_sstHLLSrc( unsigned_32 base, unsigned_32 offset, unsigned_3
+     Wread( &mod, sizeof( mod ) );
+@@ -532,49 +948,54 @@ static void dump_hll_sstHLLSrc( unsigned_32 base, unsigned_32 offset, unsigned_3
  {
      /* unused parameters */ (void)size;
  
@@ -745,7 +721,7 @@ index 6df1371203..482c571c95 100644
 +                Wdputs( "H name: \"" );
 +                count += Dump_name();
 +                Wdputslc( "\"\n" );
-+            }
+             }
 +            Wdputslc( "\n" );
 +        } else if( first_entry.core.entry_type == 0x00 ) {
 +            hl3_linnum_entry    lnum_entry;
@@ -755,7 +731,7 @@ index 6df1371203..482c571c95 100644
 +                Wread( &lnum_entry, sizeof( lnum_entry ) );
 +                count += sizeof( lnum_entry );
 +                Dump_header( &lnum_entry, hll_linnum_entry_msg, 4 );
-             }
++            }
 +            Wdputslc( "\n" );
 +        } else {
 +            Wdputslc( "unsupported linnum table entry format\n" );
@@ -767,22 +743,12 @@ index 6df1371203..482c571c95 100644
      } else {
          hl2_linnum_first    first_entry;
          unsigned_32         index;
-@@ -621,7 +1046,7 @@ static void dump_cv_subsection( unsigned_32 base, cv3_dir_entry *dir )
-     switch( sst_index ) {
-     case hll_sstModules:
-         if( Debug_options & MODULE_INFO ) {
--            dump_cv_sstModules( base, dir->lfo );
-+            dump_hll_sstSymbols( base, dir->lfo, dir->cb );
-         }
-         break;
-     case hll_sstPublics:
-@@ -636,13 +1061,16 @@ static void dump_cv_subsection( unsigned_32 base, cv3_dir_entry *dir )
+@@ -636,13 +1057,15 @@ static void dump_cv_subsection( unsigned_32 base, cv3_dir_entry *dir )
          break;
      case hll_sstSymbols:
          if( Debug_options & MODULE_INFO ) {
 -            dump_cv_sstSymbols( base, dir->lfo, dir->cb );
-+            // komh: not implmeneted yet
-+            // dump_cv_sstSymbols( base, dir->lfo, dir->cb );
++            dump_hll_sstSymbols( base, dir->lfo, dir->cb );
          }
          break;
      case hll_sstLibraries:
@@ -794,7 +760,7 @@ index 6df1371203..482c571c95 100644
          if( Debug_options & LINE_NUMS ) {
              dump_cv_sstSrcLnSeg( base, dir->lfo );
          }
-@@ -671,6 +1099,12 @@ static void dump_hll_subsection( unsigned_32 base, hll_dir_entry *dir )
+@@ -671,6 +1094,12 @@ static void dump_hll_subsection( unsigned_32 base, hll_dir_entry *dir )
              dump_hll_sstPublics( base, dir->lfo, dir->cb );
          }
          break;
@@ -807,7 +773,7 @@ index 6df1371203..482c571c95 100644
      case hll_sstLibraries:
          dump_cv_sstLibraries( base, dir->lfo, dir->cb );
          break;
-@@ -732,7 +1166,15 @@ static void dump_hll( unsigned_32 base )
+@@ -732,7 +1161,15 @@ static void dump_hll( unsigned_32 base )
      Dump_header( &dir_info , hll_dir_info_msg, 4 );
      Wdputslc( "\n" );
      for( i = 0; i < dir_info.cDir; ++i ) {
