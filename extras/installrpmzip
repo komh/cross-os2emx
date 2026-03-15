@@ -1,19 +1,18 @@
 #! /bin/sh
 
-me=$(basename $0)
+myname=$(basename $0)
 mydir=$(dirname $0)
 
 package="$1"
 destdir="$2"
 
 if [ -z "$package" ] ; then
-  echo "Usage: $me package[_oc00[.zip]] [destdir]"
+  echo "Usage: $myname package[_oc00[.zip]] [destdir]"
   echo
-  echo "This will install the include and lib dir of package[_oc00[.zip]]"
-  echo "to the include and lib dir of of destdir."
+  echo "This will install package[_oc00[.zip] to destdir."
   echo "If destdir is omitted, destdir will be i686-pc-os2-emx of" \
        "the parent dir of"
-  echo "the dir where $me is. That is, dir/../i686-pc-os2-emx."
+  echo "the dir where $myname is. That is, dir/../i686-pc-os2-emx."
   exit 1
 fi
 
@@ -36,8 +35,10 @@ package=${package%_oc00}
 package="${package}_oc00.zip"
 
 $WGET "$zipurl/$package" &&
-$UNZIP -u "$package" -d "$package.dir" &&
-$MKDIR_P "$targetprefix" &&
-$CP -a "$package.dir/@unixroot/usr/include" "$targetprefix" &&
-$CP -a "$package.dir/@unixroot/usr/lib" "$targetprefix"
+  $UNZIP -u "$package" -d "$package.dir" &&
+  $MKDIR_P "$targetprefix" &&
+  for d in "$package.dir/@unixroot/usr"/* ; do
+    $CP -a "$d" "$targetprefix" || break
+  done
+
 $RM -rf "$package.dir" "$package"
