@@ -1,7 +1,7 @@
 # Makefile to build cross-os2emx
 
 PACKAGE := cross-os2emx
-VERSION := 1.0.0
+VERSION := $(shell git describe --abbrev=0)
 
 TAR := tar
 TARFLAGS := cvzf
