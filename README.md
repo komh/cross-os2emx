@@ -2,16 +2,32 @@
 
 This is a cross compilation toolchain for i686-pc-os2-emx target.
 
-This consists of binutils, gcc and LIBCn.
+This consists of binutils, gcc, LIBCn, cmake, and some build tools.
 
 * binutils is v2.33 from https://github.com/bitwiseworks/binutils-os2.
 * gcc is v9.2.0 from https://github.com/bitwiseworks/gcc-os2.
 * LIBCn is v0.1.14 from https://github.com/bitwiseworks/libc.
+* cmake is v3.31.7 from https://github.com/bitwiseworks/cmake-os2.
 
 Tested hosts:
 * x86_64-unknown-linux-gnu
 
 # History
+
+* cross-os2emx v1.0.0 (2026/03/15)
+    * Renamed to cross-os2emx
+    * Added 64-bit version of wl and wrc
+    * Added kdllar v1.3.0, nasm v3.01, ninja v1.13.1, and cmake v3.31.7
+    * Added shared libgcc and libstdc++-v3
+    * Added libssp
+    * Added cross build definition files for Meson
+      (i686-pc-os2-emx-aout.txt for aout, and i686-pc-os2-emx-omf.txt for omf in /path/to/opt/os2emx/share/meson/cross)
+    * Added a basic cross file for CMake
+      (i686-pc-os2-emx.cmake in /path/to/opt/os2emx/share/cmake/cross)
+    * Added installrpmzip to install additional libs from netlabs rpm server
+    * Fixed bashism. Issue #4. Reported by Dave Yeo
+    * Fixed ICE due to __declspec(dllexport). Issue #9
+    * Fixed misc.
 
 * os2emx-cross-toolchain-b1 (20206/02/23)
     * Released at github
@@ -28,6 +44,17 @@ Tested hosts:
     * Added gcc v9.2.0
         * Always link to libgcc.a
 
+# How to install additional libs with `installrpmzip`
+
+1. Find the necessary libs at https://rpm.netlabs.org/release/00/zip
+
+2. Copy the package name including `.zip` not the URL
+
+3. Execute `installrpmzip` with the package name. For example if you want to install pthread:
+```
+    /path/to/opt/os2emx/bin/installrpmzip pthread-0_2_6-1_oc00.zip
+```
+
 # How to build
 
 1. Clone the sources from github:
@@ -42,24 +69,24 @@ Tested hosts:
 4. Install:
     `make install`
 
-    This will installs the built files into `$HOME/opt/os2emx`.
+    This will install the built files into `$HOME/opt/os2emx`.
 
 * **NOTE**: `autoconf v2.69` is required by binutils and gcc.
-* **NOTE 2**: `wget` and `unzip` is required to download and to extract LIBCn binaries.
-* **NOTE 3**: Unless you set `PREFIXROOT`, `PREFIXROOT` is set to `$HOME` by default. If you want to set PREFIXROOT to other directory than **$HOME**. then you should set **PREFIXROOT** to the same value **WHENEVER** calling **make**. For example,
+* **NOTE 2**: Some tools and libs such as a`utopoint`, `textinfo`, `flex`, `openssl`, and so on are required by gcc.
+* **NOTE 3**: `wget` and `unzip` is required to download and to extract LIBCn binaries.
+* **NOTE 4**: Unless you set `PREFIXROOT`, `PREFIXROOT` is set to `$HOME` by default. If you want to set PREFIXROOT to other directory than **$HOME**. then you should set **PREFIXROOT** to the same value **WHENEVER** calling **make**. For example,
 
 ```
     make PREFIXROOT=/
     make install PREFIXROOT=/
 ```
-This will installs into `$PREFIXROOT/opt/os2emx`.
+This will install into `$PREFIXROOT/opt/os2emx`.
 
 # Known problems
 
 * Some .so files are missing in pre-built binaries such as libiconv.so.2 and libmpfr.so.4 and so on. For this, see https://github.com/komh/cross-os2emx/issues/2.
 * Additional data sections such as `___eh_frame___` are embedded into an object file. As a result, conversion from OMF objects to a.out objects with `emxaout` fails. However, there are any practical problems, yet.
-* Shared libgcc and libstdc++-v3 are not provided.
-* `-Zsym` does not generate .sym file at all. `mapsym.cmd` should be ported.
+* `-Zomf -Zsym` does not generate .sym file at all. `mapsym.cmd` should be ported.
 
 # Donation
 
