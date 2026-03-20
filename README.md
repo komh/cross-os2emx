@@ -72,9 +72,10 @@ Tested hosts:
     This will install the built files into `$HOME/opt/os2emx`.
 
 * **NOTE**: `autoconf v2.69` is required by binutils and gcc.
-* **NOTE 2**: Some tools and libs such as a`utopoint`, `textinfo`, `flex`, `openssl`, and so on are required by gcc.
-* **NOTE 3**: `wget` and `unzip` is required to download and to extract LIBCn binaries.
-* **NOTE 4**: Unless you set `PREFIXROOT`, `PREFIXROOT` is set to `$HOME` by default. If you want to set PREFIXROOT to other directory than **$HOME**. then you should set **PREFIXROOT** to the same value **WHENEVER** calling **make**. For example,
+* **NOTE 2**: Some tools and libs such as `autopoint`, `textinfo`, `flex`, and so on are required by gcc.
+* **NOTE 3**: `libssl` and `libcrypto` of `openssl` are required by cmake.
+* **NOTE 4**: `wget` and `unzip` is required to download and to extract LIBCn binaries.
+* **NOTE 5**: Unless you set `PREFIXROOT`, `PREFIXROOT` is set to `$HOME` by default. If you want to set PREFIXROOT to other directory than **$HOME**. then you should set **PREFIXROOT** to the same value **WHENEVER** calling **make**. For example,
 
 ```
     make PREFIXROOT=/
