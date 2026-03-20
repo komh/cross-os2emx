@@ -1,23 +1,24 @@
-From 3ef55263bb705d3975e9cd9af2dfcccabf6616ee Mon Sep 17 00:00:00 2001
+From c9c584f152c95764e63a09ea736d2cb8463c878c Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 18:55:01 +0900
-Subject: [PATCH 2/3] Allow to cross-compile for *-os2-emx target
+Subject: [PATCH 2/5] Allow to cross-compile for *-os2-emx target
 
 ---
  gcc/Makefile.in               |  2 +-
  gcc/config/i386/emx-driver.c  |  2 ++
  gcc/config/i386/emx.c         |  4 ++--
  gcc/config/i386/emx.h         | 10 ++++++++++
- gcc/config/i386/i386.c        | 12 ++++++------
+ gcc/config/i386/i386.c        | 18 +++++++++---------
  gcc/config/i386/i386.h        |  2 +-
  gcc/config/i386/predicates.md |  2 +-
  gcc/config/i386/t-emx         |  2 +-
  gcc/cp/dump.c                 |  6 +++---
+ gcc/gcc.c                     |  2 +-
  gcc/genattrtab.c              |  2 +-
  gcc/gengtype.c                |  4 ++--
  gcc/reg-stack.c               |  4 ++--
  libstdc++-v3/crossconfig.m4   |  6 ++++++
- 13 files changed, 38 insertions(+), 20 deletions(-)
+ 14 files changed, 42 insertions(+), 24 deletions(-)
 
 diff --git a/gcc/Makefile.in b/gcc/Makefile.in
 index 945d92881..8414f6260 100644
@@ -106,7 +107,7 @@ index 1409bb6f1..93b0343e7 100644
  #endif
  
 diff --git a/gcc/config/i386/i386.c b/gcc/config/i386/i386.c
-index 907ff2f33..d83f30316 100644
+index 907ff2f33..0d00c1ee4 100644
 --- a/gcc/config/i386/i386.c
 +++ b/gcc/config/i386/i386.c
 @@ -34,7 +34,7 @@ along with GCC; see the file COPYING3.  If not see
@@ -127,6 +128,24 @@ index 907ff2f33..d83f30316 100644
  extern bool i386_emx_binds_local_p (const_tree);
  #endif
  
+@@ -4204,7 +4204,7 @@ ix86_option_override_internal (bool main_args_p,
+   set_ix86_tune_features (ix86_tune, opts->x_ix86_dump_tunes);
+ 
+ #ifndef USE_IX86_FRAME_POINTER
+-#ifdef __OS2__
++#if defined(__OS2__) || defined(EMX)
+ /* OS/2 needs the frame pointer to have proper stack trace when debugging
+    so it needs to be enabled by default. However, the configure portion that
+    sets a default for --enable-frame-pointer is executed after config.gcc which
+@@ -4241,7 +4241,7 @@ ix86_option_override_internal (bool main_args_p,
+ 	opts->x_flag_omit_frame_pointer
+ 	  = !(USE_IX86_FRAME_POINTER || opts->x_optimize_size);
+       if (opts->x_flag_asynchronous_unwind_tables == 2)
+-#ifdef __OS2__
++#if defined(__OS2__) || defined(EMX)
+ 	/* Don't emit DWARF2 unwind tables on OS/2 by default as it makes no use
+ 	   of it (this would only add unresolved __ehInit in each object).  */
+ 	opts->x_flag_asynchronous_unwind_tables = 0;
 @@ -6643,7 +6643,7 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args,
      }
  #endif
@@ -145,6 +164,15 @@ index 907ff2f33..d83f30316 100644
        /* DLLIMPORT symbols are never valid.  */
        if (TARGET_DLLIMPORT_DECL_ATTRIBUTES
  	  && SYMBOL_REF_DLLIMPORT_P (x))
+@@ -17004,7 +17004,7 @@ get_dllimport_decl (tree decl, bool beimport)
+   name = targetm.strip_name_encoding (name);
+   if (beimport)
+     prefix = name[0] == FASTCALL_PREFIX || user_label_prefix[0] == 0
+-#ifndef __OS2__
++#if !(defined(__OS2__) || defined(EMX))
+       ? "*__imp_" : "*__imp__";
+ #else
+       ? "" : "";
 @@ -17155,7 +17155,7 @@ ix86_legitimize_address (rtx x, rtx, machine_mode mode)
        return gen_rtx_PLUS (Pmode, t, XEXP (XEXP (x, 0), 1));
      }
@@ -233,6 +261,19 @@ index fa192b9ed..0ee457578 100644
    cp_dump_attributes (di, t);
  #endif
  
+diff --git a/gcc/gcc.c b/gcc/gcc.c
+index 41817ec0f..4172ff994 100644
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -8420,7 +8420,7 @@ lookup_compiler (const char *name, size_t length, const char *language)
+ 	break;
+     }
+ 
+-#if defined (OS2) ||defined (HAVE_DOS_BASED_FILE_SYSTEM)
++#ifdef HAVE_DOS_BASED_FILE_SYSTEM
+   /* Look again, but case-insensitively this time.  */
+   if (cp < compilers)
+     for (cp = compilers + n_compilers - 1; cp >= compilers; cp--)
 diff --git a/gcc/genattrtab.c b/gcc/genattrtab.c
 index 0829e76b7..c473a9bcf 100644
 --- a/gcc/genattrtab.c
