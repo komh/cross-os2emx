@@ -1,4 +1,4 @@
-From afdb6dd279e1d9f9125bf7b605eaa573f3a210e4 Mon Sep 17 00:00:00 2001
+From d9582f1b888009c146bdc0e6b5ddb5036a983d89 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 22:17:31 +0900
 Subject: [PATCH 2/3] Port to 64-bit platforms
@@ -15,6 +15,7 @@ Subject: [PATCH 2/3] Port to 64-bit platforms
  src/emx/src/emxbind/resource.c  |   4 +-
  src/emx/src/emxexp/emxexp.c     |  12 +-
  src/emx/src/emximp/emximp.c     |  90 ++++++------
+ src/emx/src/emxomf/emxaout.c    |   8 +-
  src/emx/src/emxomf/emxomf.c     |  30 ++--
  src/emx/src/emxomf/emxomf.h     |   6 +-
  src/emx/src/emxomf/emxomfld.c   |   6 +-
@@ -25,7 +26,7 @@ Subject: [PATCH 2/3] Port to 64-bit platforms
  src/emx/src/include/defs.h      |   2 +-
  src/emx/src/ld/ld.c             | 251 ++++++++++++++++++++++----------
  src/emx/src/libomflib/omflib0.h |   4 +-
- 21 files changed, 371 insertions(+), 266 deletions(-)
+ 22 files changed, 375 insertions(+), 270 deletions(-)
 
 diff --git a/src/emx/include/a_out.h b/src/emx/include/a_out.h
 index 4368077..de43383 100644
@@ -427,6 +428,46 @@ index 7bcae03..06c391c 100644
          unsigned char   e32_res3[20];
      }           os2hdr;
  #pragma pack()
+diff --git a/src/emx/src/emxomf/emxaout.c b/src/emx/src/emxomf/emxaout.c
+index 0d45d04..e6040ab 100644
+--- a/src/emx/src/emxomf/emxaout.c
++++ b/src/emx/src/emxomf/emxaout.c
+@@ -94,7 +94,7 @@ struct extdef
+ struct symbol
+ {
+   char *name;
+-  struct nlist n;
++  struct ninfo n;
+ };
+ 
+ struct thread
+@@ -1122,7 +1122,7 @@ static void conv_fixupp (void)
+ static void make_symtab (void)
+ {
+   int i, j;
+-  struct nlist n;
++  struct ninfo n;
+   char skip;
+ 
+   /* Important: Write extdefs first, to be able to use EXTDEF indices
+@@ -1182,7 +1182,7 @@ static void write_symtab (void)
+           symbols[i].n.n_un.n_strx = str_size;
+           str_size += strlen (symbols[i].name) + 1;
+         }
+-      fwrite (&symbols[i].n, sizeof (struct nlist), 1, out_file);
++      fwrite (&symbols[i].n, sizeof (struct ninfo), 1, out_file);
+     }
+   fwrite (&str_size, sizeof (dword), 1, out_file);
+   for (i = 0; i < GROW_COUNT (symbols); ++i)
+@@ -1205,7 +1205,7 @@ static void conv_modend (void)
+   h.a_text = (seg_code >= 0 ? segments[seg_code].size : 0);
+   h.a_data = (seg_data >= 0 ? segments[seg_data].size : 0);
+   h.a_bss =  (seg_bss  >= 0 ? segments[seg_bss ].size : 0);
+-  h.a_syms = GROW_COUNT (symbols) * sizeof (struct nlist);
++  h.a_syms = GROW_COUNT (symbols) * sizeof (struct ninfo);
+   h.a_entry = 0;
+   h.a_trsize = GROW_COUNT (trelocs) * sizeof (struct relocation_info);
+   h.a_drsize = GROW_COUNT (drelocs) * sizeof (struct relocation_info);
 diff --git a/src/emx/src/emxomf/emxomf.c b/src/emx/src/emxomf/emxomf.c
 index 977ddbc..871852d 100644
 --- a/src/emx/src/emxomf/emxomf.c
