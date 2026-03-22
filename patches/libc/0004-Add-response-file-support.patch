@@ -1,0 +1,174 @@
+From 260c5eb4fee650ac156745d49c51a73aeeac3875 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sun, 22 Mar 2026 20:20:20 +0900
+Subject: [PATCH 4/4] Add response file support
+
+---
+ src/emx/src/emxexp/emxexp.c        | 2 ++
+ src/emx/src/emximp/Makefile.cross  | 2 ++
+ src/emx/src/emximp/emximp.c        | 2 ++
+ src/emx/src/emxomf/emxaout.c       | 2 ++
+ src/emx/src/emxomf/emxomf.c        | 2 ++
+ src/emx/src/emxomf/emxomfar.c      | 2 ++
+ src/emx/src/emxomf/emxomfld.c      | 2 ++
+ src/emx/src/emxomf/emxomfstrip.c   | 5 +++++
+ src/emx/src/emxomf/stripomf.c      | 2 ++
+ src/emx/src/ld/ld.c                | 1 +
+ src/emx/src/libcrossemx/crossemx.h | 4 ++++
+ 11 files changed, 26 insertions(+)
+
+diff --git a/src/emx/src/emxexp/emxexp.c b/src/emx/src/emxexp/emxexp.c
+index aa87bc0..66f5dc9 100644
+--- a/src/emx/src/emxexp/emxexp.c
++++ b/src/emx/src/emxexp/emxexp.c
+@@ -956,6 +956,8 @@ int main (int argc, char **argv)
+ #ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+   opterr = 0;
+   optind = 0;
+diff --git a/src/emx/src/emximp/Makefile.cross b/src/emx/src/emximp/Makefile.cross
+index a3ad6df..887737e 100644
+--- a/src/emx/src/emximp/Makefile.cross
++++ b/src/emx/src/emximp/Makefile.cross
+@@ -26,6 +26,8 @@
+ EMXDIR := ../..
+ SRCDIR := .
+ 
++BINUTILSDIR := ../../../../../binutils-os2
++
+ TARGETEXES := emximp
+ 
+ emximp_SRCS := emximp.c
+diff --git a/src/emx/src/emximp/emximp.c b/src/emx/src/emximp/emximp.c
+index 06c391c..088db4b 100644
+--- a/src/emx/src/emximp/emximp.c
++++ b/src/emx/src/emximp/emximp.c
+@@ -1484,6 +1484,8 @@ int main (int argc, char *argv[])
+ 
+ #ifdef __EMX__
+   _response (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+   predefs = NULL; out_base = NULL; as_name = NULL; pipe_flag = FALSE;
+   profile_flag = FALSE; page_size = 16;
+diff --git a/src/emx/src/emxomf/emxaout.c b/src/emx/src/emxomf/emxaout.c
+index e6040ab..23bb63c 100644
+--- a/src/emx/src/emxomf/emxaout.c
++++ b/src/emx/src/emxomf/emxaout.c
+@@ -1358,6 +1358,8 @@ int main (int argc, char *argv[])
+ #ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+ 
+   /* Set default values of some options. */
+diff --git a/src/emx/src/emxomf/emxomf.c b/src/emx/src/emxomf/emxomf.c
+index 871852d..4b4268e 100644
+--- a/src/emx/src/emxomf/emxomf.c
++++ b/src/emx/src/emxomf/emxomf.c
+@@ -4174,6 +4174,8 @@ int main (int argc, char *argv[])
+   _envargs (&argc, &argv, "EMXOMFOPT");
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+ 
+   /* Set default values of some options. */
+diff --git a/src/emx/src/emxomf/emxomfar.c b/src/emx/src/emxomf/emxomfar.c
+index 26e6cd1..ecee713 100644
+--- a/src/emx/src/emxomf/emxomfar.c
++++ b/src/emx/src/emxomf/emxomfar.c
+@@ -262,6 +262,8 @@ int main (int argc, char *argv[])
+ #ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+ 
+   /* The default page size was 16, now we'll calculate one with 
+diff --git a/src/emx/src/emxomf/emxomfld.c b/src/emx/src/emxomf/emxomfld.c
+index d60f557..f1db8d7 100644
+--- a/src/emx/src/emxomf/emxomfld.c
++++ b/src/emx/src/emxomf/emxomfld.c
+@@ -1725,6 +1725,8 @@ int main (int argc, char *argv[])
+ #ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#else
++  expandargv (&argc, &argv);
+ #endif
+ 
+   /* Close and delete the response file on exit. */
+diff --git a/src/emx/src/emxomf/emxomfstrip.c b/src/emx/src/emxomf/emxomfstrip.c
+index 1195d7c..0ce8a38 100644
+--- a/src/emx/src/emxomf/emxomfstrip.c
++++ b/src/emx/src/emxomf/emxomfstrip.c
+@@ -25,6 +25,9 @@
+ # include <io.h>
+ # define ftruncate _chsize
+ #endif
++#ifndef __EMX__
++#include "crossemx.h"
++#endif
+ 
+ 
+ 
+@@ -296,6 +299,8 @@ int main(int argc, char **argv)
+     _envargs(&argc, &argv, "EMXOMFSTRIPOPT");
+     _response(&argc, &argv);
+     _wildcard(&argc, &argv);
++#else
++    expandargv (&argc, &argv);
+ #endif
+ 
+     /*
+diff --git a/src/emx/src/emxomf/stripomf.c b/src/emx/src/emxomf/stripomf.c
+index 90f4406..638eaa8 100644
+--- a/src/emx/src/emxomf/stripomf.c
++++ b/src/emx/src/emxomf/stripomf.c
+@@ -334,6 +334,8 @@ int main(int argc, char **argv)
+ #ifdef __EMX__
+     _response (&argc, &argv);
+     _wildcard (&argc, &argv);
++#else
++    expandargv (&argc, &argv);
+ #endif
+ 
+ #ifdef __EMX__
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index e2cec06..30781d9 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -963,6 +963,7 @@ main (argc, argv)
+   _wildcard (&argc, &argv);
+   page_size = getpagesize ();
+ #else
++  expandargv (&argc, &argv);
+   page_size = 4096;
+ #endif
+   progname = argv[0];
+diff --git a/src/emx/src/libcrossemx/crossemx.h b/src/emx/src/libcrossemx/crossemx.h
+index a998116..62c3987 100644
+--- a/src/emx/src/libcrossemx/crossemx.h
++++ b/src/emx/src/libcrossemx/crossemx.h
+@@ -96,4 +96,8 @@ static inline long fibGetMsCount (void)
+ 
+ /* io.h */
+ #define _chsize(fd, size) ftruncate ((fd), (size))
++
++/* libiberty.h */
++void expandargv (int *, char ***);
++
+ #endif
+-- 
+2.43.0
+
