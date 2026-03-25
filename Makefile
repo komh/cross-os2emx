@@ -86,7 +86,7 @@ all-gcc: install-binutils install-libc install-emxtools install-extras
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
-	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
+	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx;
 	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) \
 	  all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp

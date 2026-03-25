@@ -1,20 +1,20 @@
-From ae33676d66d4d91ea2e4475d8e45b2e4e650de76 Mon Sep 17 00:00:00 2001
+From 1166e1cf2950842dbd10d68745ba32ceaf9de812 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 1 Mar 2026 01:58:29 +0900
 Subject: [PATCH 4/5] Build DLLs for libgcc and libstdc++-v3
 
 ---
- conf-os2emx-cross            |  2 +-
+ conf-cross-os2emx            |  2 +-
  config/lthostflags.m4        |  3 +++
  libgcc/config/i386/t-emx     | 10 +++++-----
  libstdc++-v3/configure.host  |  1 +
  libstdc++-v3/src/Makefile.am |  2 +-
  5 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/conf-os2emx-cross b/conf-os2emx-cross
-index aa4b32e83..1d62c46de 100755
---- a/conf-os2emx-cross
-+++ b/conf-os2emx-cross
+diff --git a/conf-cross-os2emx b/conf-cross-os2emx
+index 0cb6810c2..37c1053a1 100755
+--- a/conf-cross-os2emx
++++ b/conf-cross-os2emx
 @@ -16,6 +16,7 @@ opts="
      --with-gnu-as
      --with-as=$prefix/bin/$target-as

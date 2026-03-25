@@ -1,17 +1,17 @@
-From 72fee50472dcaf88e166574a9d218b6c262b2877 Mon Sep 17 00:00:00 2001
+From 33fd2708ddae9042dd93080c3d5d83b76772dab6 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 1 Mar 2026 18:34:46 +0900
 Subject: [PATCH 5/5] Build libssp
 
 ---
- conf-os2emx-cross | 1 -
- mk-os2emx-cross   | 2 ++
+ conf-cross-os2emx | 1 -
+ mk-cross-os2emx   | 2 ++
  2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/conf-os2emx-cross b/conf-os2emx-cross
-index 1d62c46de..77b1ddd1a 100755
---- a/conf-os2emx-cross
-+++ b/conf-os2emx-cross
+diff --git a/conf-cross-os2emx b/conf-cross-os2emx
+index 37c1053a1..dd565bf88 100755
+--- a/conf-cross-os2emx
++++ b/conf-cross-os2emx
 @@ -22,7 +22,6 @@ opts="
      --enable-checking=release
      --disable-bootstrap
@@ -20,10 +20,10 @@ index 1d62c46de..77b1ddd1a 100755
      --disable-libquadmath
      --disable-multilib
      --disable-lto
-diff --git a/mk-os2emx-cross b/mk-os2emx-cross
+diff --git a/mk-cross-os2emx b/mk-cross-os2emx
 index 3013ea91e..9bdea141d 100755
---- a/mk-os2emx-cross
-+++ b/mk-os2emx-cross
+--- a/mk-cross-os2emx
++++ b/mk-cross-os2emx
 @@ -3,6 +3,8 @@
  make all-gcc &&
  make all-target-libgcc &&
