@@ -5,6 +5,7 @@ VERSION := $(shell git describe --abbrev=0)
 
 TAR := tar
 TARFLAGS := cvzf
+TARXFLAGS := xvzf
 TARBALL := $(PACKAGE)-$(VERSION).tar.gz
 
 # Directory where cross-os2emx will be installed.
@@ -36,6 +37,14 @@ LN_S := ln -s
 MV := mv
 SED := sed
 
+AUTOTOOLSDIR := autotools
+AUTOCONFTGZ := autoconf-2.69.tar.gz
+AUTOCONFTGZURL := https://ftp.gnu.org/gnu/autoconf/$(AUTOCONFTGZ)
+AUTOMAKETGZ := automake-1.18.1.tar.gz
+AUTOMAKETGZURL := https://ftp.gnu.org/gnu/automake/$(AUTOMAKETGZ)
+LIBTOOLTGZ := 2.5.4-os2-r2.tar.gz
+LIBTOOLTGZURL := https://github.com/komh/libtool-os2/archive/refs/tags/$(LIBTOOLTGZ)
+
 BINUTILSDIR := binutils-os2
 LIBCDIR := libc
 GCCDIR := gcc-os2
@@ -58,16 +67,58 @@ BUILDDIR := build
 		clean-cmake \
 		dist
 
-all: all-binutils all-libc all-emxtools all-gcc all-meson all-cmake
+all: all-autotools all-binutils all-libc all-emxtools all-gcc all-meson \
+     all-cmake
 
-all-binutils:
+.PHONY: all-autotools
+
+all-autotools: all-autoconf all-automake all-libtool
+
+.PHONY: all-autoconf
+
+all-autoconf: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
+	cd $(AUTOTOOLSDIR); \
+	$(TAR) $(TARXFLAGS) $(AUTOCONFTGZ) || exit 1; \
+	cd $(AUTOCONFTGZ:.tar.gz=); \
+	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+
+$(AUTOTOOLSDIR)/$(AUTOCONFTGZ):
+	$(MKDIR_P) $(AUTOTOOLSDIR)
+	cd $(AUTOTOOLSDIR); $(WGET) $(AUTOCONFTGZURL)
+
+.PHONY: all-automake
+
+all-automake: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
+	cd $(AUTOTOOLSDIR); \
+	$(TAR) $(TARXFLAGS) $(AUTOMAKETGZ) || exit 1; \
+	cd $(AUTOMAKETGZ:.tar.gz=); \
+	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+
+$(AUTOTOOLSDIR)/$(AUTOMAKETGZ):
+	$(MKDIR_P) $(AUTOTOOLSDIR)
+	cd $(AUTOTOOLSDIR); $(WGET) $(AUTOMAKETGZURL)
+
+.PHONY: all-libtool
+
+all-libtool: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
+	cd $(AUTOTOOLSDIR); \
+	$(TAR) $(TARXFLAGS) $(LIBTOOLTGZ) || exit 1; \
+	cd libtool-os2-$(LIBTOOLTGZ:.tar.gz=); \
+	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+
+$(AUTOTOOLSDIR)/$(LIBTOOLTGZ):
+	$(MKDIR_P) $(AUTOTOOLSDIR)
+	cd $(AUTOTOOLSDIR); $(WGET) $(LIBTOOLTGZURL)
+
+all-binutils: all-autotools
 	$(MKDIR_P) $(BINUTILSDIR)/$(BUILDDIR)
-	cd $(BINUTILSDIR); \
+	export PATH=$$PWD/$(AUTOTOOLSDIR)/bin:$$PATH; \
+    cd $(BINUTILSDIR); \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
-	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx;
-	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR)
+	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx || exit 1; \
+	$(MAKE)
 
 all-libc: $(LIBCZIPDIR)/$(LIBCZIP)
 	$(UNZIP) $(LIBCZIPDIR)/$(LIBCZIP) -d $(LIBCZIPDIR)
@@ -79,17 +130,18 @@ $(LIBCZIPDIR)/$(LIBCZIP):
 all-emxtools: all-binutils
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross
 
-all-gcc: install-binutils install-libc install-emxtools install-extras
+all-gcc: all-autotools install-binutils install-libc install-emxtools \
+         install-extras
 	$(MKDIR_P) $(GCCDIR)/$(BUILDDIR)
+	export PATH=$$PWD/$(AUTOTOOLSDIR)/bin:$$PATH; \
 	cd $(GCCDIR); \
 	contrib/download_prerequisites || exit 1; \
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
-	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx;
-	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
-	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) \
-	  all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp
+	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx || exit 1; \
+	export PATH=$(DESTDIR)$(BINDIR):$$PATH; \
+	$(MAKE) all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp
 
 all-meson: $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt
 
@@ -187,7 +239,7 @@ dist:
 	$(RM) -r $(PACKAGE)-$(VERSION)
 
 clean: clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
-       clean-cmake
+       clean-cmake clean-autotools
 	$(RM) $(TARBALL)
 
 clean-binutils:
@@ -208,3 +260,7 @@ clean-meson:
 clean-cmake:
 	$(RM) $(CMAKECROSSFILE)
 	$(RM) -r $(CMAKEDIR)/$(BUILDDIR)
+
+.PHONY: clean-autools
+clean-autotools:
+	$(RM) -r $(AUTOTOOLSDIR)
