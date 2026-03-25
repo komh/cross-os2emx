@@ -66,7 +66,7 @@ all-binutils:
 	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
-	  PREFIXROOT=$(PREFIXROOT) ../conf-os2emx-cross;
+	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx;
 	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR)
 
 all-libc: $(LIBCZIPDIR)/$(LIBCZIP)
