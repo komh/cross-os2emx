@@ -36,6 +36,7 @@ CP := cp
 LN_S := ln -s
 MV := mv
 SED := sed
+TOUCH := touch
 
 AUTOTOOLSDIR := autotools
 AUTOCONFTGZ := autoconf-2.69.tar.gz
@@ -69,11 +70,13 @@ all-autotools:
 
 .PHONY: all-autotools-autoconf
 all-autotools: all-autotools-autoconf
-all-autotools-autoconf: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
+all-autotools-autoconf: $(AUTOTOOLSDIR)/autoconf.done
+$(AUTOTOOLSDIR)/autoconf.done: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(AUTOCONFTGZ) || exit 1; \
 	cd $(AUTOCONFTGZ:.tar.gz=); \
 	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+	$(TOUCH) $@
 
 $(AUTOTOOLSDIR)/$(AUTOCONFTGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
@@ -81,11 +84,13 @@ $(AUTOTOOLSDIR)/$(AUTOCONFTGZ):
 
 .PHONY: all-autotools-automake
 all-autotools: all-autotools-automake
-all-autotools-automake: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
+all-autotools-automake: $(AUTOTOOLSDIR)/automake.done
+$(AUTOTOOLSDIR)/automake.done: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(AUTOMAKETGZ) || exit 1; \
 	cd $(AUTOMAKETGZ:.tar.gz=); \
 	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+	$(TOUCH) $@
 
 $(AUTOTOOLSDIR)/$(AUTOMAKETGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
@@ -93,11 +98,13 @@ $(AUTOTOOLSDIR)/$(AUTOMAKETGZ):
 
 .PHONY: all-autotools-libtool
 all-autotools: all-autotools-libtool
-all-autotools-libtool: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
+all-autotools-libtool: $(AUTOTOOLSDIR)/libtool.done
+$(AUTOTOOLSDIR)/libtool.done: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(LIBTOOLTGZ) || exit 1; \
 	cd libtool-os2-$(LIBTOOLTGZ:.tar.gz=); \
 	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+	$(TOUCH) $@
 
 $(AUTOTOOLSDIR)/$(LIBTOOLTGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
@@ -117,8 +124,10 @@ all-binutils: all-autotools
 
 .PHONY: all-libc
 all: all-libc
-all-libc: $(LIBCZIPDIR)/$(LIBCZIP)
+all-libc: $(LIBCZIPDIR)/libc.done
+$(LIBCZIPDIR)/libc.done: $(LIBCZIPDIR)/$(LIBCZIP)
 	$(UNZIP) $(LIBCZIPDIR)/$(LIBCZIP) -d $(LIBCZIPDIR)
+	$(TOUCH) $@
 
 $(LIBCZIPDIR)/$(LIBCZIP):
 	$(MKDIR_P) $(LIBCZIPDIR)
