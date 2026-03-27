@@ -45,6 +45,7 @@ AUTOMAKETGZ := automake-1.18.1.tar.gz
 AUTOMAKETGZURL := https://ftp.gnu.org/gnu/automake/$(AUTOMAKETGZ)
 LIBTOOLTGZ := 2.5.4-os2-r2.tar.gz
 LIBTOOLTGZURL := https://github.com/komh/libtool-os2/archive/refs/tags/$(LIBTOOLTGZ)
+LIBTOOLDIR := $(AUTOTOOLSDIR)/libtool-os2-$(LIBTOOLTGZ:.tar.gz=)
 
 BINUTILSDIR := binutils-os2
 LIBCDIR := libc
@@ -100,10 +101,13 @@ $(AUTOTOOLSDIR)/$(AUTOMAKETGZ):
 all-autotools: all-autotools-libtool
 all-autotools-libtool: $(AUTOTOOLSDIR)/libtool.done
 $(AUTOTOOLSDIR)/libtool.done: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
-	cd $(AUTOTOOLSDIR); \
-	$(TAR) $(TARXFLAGS) $(LIBTOOLTGZ) || exit 1; \
-	cd libtool-os2-$(LIBTOOLTGZ:.tar.gz=); \
-	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
+	test -f $(LIBTOOLDIR)/configure \
+	  || ( cd $(AUTOTOOLSDIR); $(TAR) $(TARXFLAGS) $(LIBTOOLTGZ); ) \
+	  || exit 1;
+	$(MKDIR_P) $(LIBTOOLDIR)/$(BUILDDIR)
+	cd $(LIBTOOLDIR)/$(BUILDDIR); \
+	../configure --prefix=$$(dirname $$(realpath ..)) \
+	  && $(MAKE) && $(MAKE) install
 	$(TOUCH) $@
 
 $(AUTOTOOLSDIR)/$(LIBTOOLTGZ):
@@ -179,6 +183,19 @@ $(CMAKECROSSFILE): $(CMAKECROSSFILE).in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
+.PHONY: all-libtool
+all: all-libtool
+all-libtool: $(AUTOTOOLSDIR)/all-libtool.done
+$(AUTOTOOLSDIR)/all-libtool.done: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
+	test -f $(LIBTOOLDIR)/configure \
+	  || ( cd $(AUTOTOOLSDIR); $(TAR) $(TARXFLAGS) $(LIBTOOLTGZ); ) \
+	  || exit 1;
+	$(MKDIR_P) $(LIBTOOLDIR)/$(BUILDDIR).all-libtool
+	cd $(LIBTOOLDIR)/$(BUILDDIR).all-libtool; \
+	../configure --prefix=$(PREFIX) --disable-ltdl-install \
+	  && $(MAKE)
+	$(TOUCH) $@
+
 .PHONY: install
 install:
 
@@ -244,6 +261,11 @@ install-cmake: all-cmake
 	  $(DESTDIR)$(SHAREDIR)/cmake/cross/$(notdir $(CMAKECROSSFILE))
 	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
 
+.PHONY: install-libtool
+install: install-libtool
+install-libtool: all-libtool
+	$(MAKE) -C $(LIBTOOLDIR)/$(BUILDDIR).all-libtool install DESTDIR=$(DESTDIR)
+
 .PHONY: dist
 dist:
 	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
@@ -306,3 +328,9 @@ clean: clean-cmake
 clean-cmake:
 	$(RM) $(CMAKECROSSFILE)
 	$(RM) -r $(CMAKEDIR)/$(BUILDDIR)
+
+.PHONY: clean-libtool
+clean: clean-libtool
+clean-libtool:
+	$(RM) -r $(LIBTOOLDIR)/build.all-libtool
+	$(RM) $(AUTOTOOLSDIR)/all-libtool.done
