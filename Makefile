@@ -60,23 +60,16 @@ LIBCZIPDIR := libc-$(TARGETSPEC)
 
 BUILDDIR := build
 
-.PHONY: all all-binutils all-libc all-emxtools all-gcc all-meson all-cmake \
-        install install-binutils install-libc install-emxtools install-extras \
-		install-gcc install-meson install-cmake \
-		clean clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
-		clean-cmake \
-		dist
-
-all: all-autotools all-binutils all-libc all-emxtools all-gcc all-meson \
-     all-cmake
+.PHONY: all
+all:
 
 .PHONY: all-autotools
+all: all-autotools
+all-autotools:
 
-all-autotools: all-autoconf all-automake all-libtool
-
-.PHONY: all-autoconf
-
-all-autoconf: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
+.PHONY: all-autotools-autoconf
+all-autotools: all-autotools-autoconf
+all-autotools-autoconf: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(AUTOCONFTGZ) || exit 1; \
 	cd $(AUTOCONFTGZ:.tar.gz=); \
@@ -86,9 +79,9 @@ $(AUTOTOOLSDIR)/$(AUTOCONFTGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
 	cd $(AUTOTOOLSDIR); $(WGET) $(AUTOCONFTGZURL)
 
-.PHONY: all-automake
-
-all-automake: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
+.PHONY: all-autotools-automake
+all-autotools: all-autotools-automake
+all-autotools-automake: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(AUTOMAKETGZ) || exit 1; \
 	cd $(AUTOMAKETGZ:.tar.gz=); \
@@ -98,9 +91,9 @@ $(AUTOTOOLSDIR)/$(AUTOMAKETGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
 	cd $(AUTOTOOLSDIR); $(WGET) $(AUTOMAKETGZURL)
 
-.PHONY: all-libtool
-
-all-libtool: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
+.PHONY: all-autotools-libtool
+all-autotools: all-autotools-libtool
+all-autotools-libtool: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
 	cd $(AUTOTOOLSDIR); \
 	$(TAR) $(TARXFLAGS) $(LIBTOOLTGZ) || exit 1; \
 	cd libtool-os2-$(LIBTOOLTGZ:.tar.gz=); \
@@ -110,6 +103,8 @@ $(AUTOTOOLSDIR)/$(LIBTOOLTGZ):
 	$(MKDIR_P) $(AUTOTOOLSDIR)
 	cd $(AUTOTOOLSDIR); $(WGET) $(LIBTOOLTGZURL)
 
+.PHONY: all-binutils
+all: all-binutils
 all-binutils: all-autotools
 	$(MKDIR_P) $(BINUTILSDIR)/$(BUILDDIR)
 	export PATH=$$PWD/$(AUTOTOOLSDIR)/bin:$$PATH; \
@@ -120,6 +115,8 @@ all-binutils: all-autotools
 	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx || exit 1; \
 	$(MAKE)
 
+.PHONY: all-libc
+all: all-libc
 all-libc: $(LIBCZIPDIR)/$(LIBCZIP)
 	$(UNZIP) $(LIBCZIPDIR)/$(LIBCZIP) -d $(LIBCZIPDIR)
 
@@ -127,9 +124,13 @@ $(LIBCZIPDIR)/$(LIBCZIP):
 	$(MKDIR_P) $(LIBCZIPDIR)
 	cd $(LIBCZIPDIR); $(WGET) $(LIBCZIPURL)
 
+.PHONY: all-emxtools
+all: all-emxtools
 all-emxtools: all-binutils
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross
 
+.PHONY: all-gcc
+all: all-gcc
 all-gcc: all-autotools install-binutils install-libc install-emxtools \
          install-extras
 	$(MKDIR_P) $(GCCDIR)/$(BUILDDIR)
@@ -143,6 +144,8 @@ all-gcc: all-autotools install-binutils install-libc install-emxtools \
 	export PATH=$(DESTDIR)$(BINDIR):$$PATH; \
 	$(MAKE) all-gcc all-target-libgcc all-target-libstdc++-v3 all-target-libssp
 
+.PHONY: all-meson
+all: all-meson
 all-meson: $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt
 
 $(MESONCROSSFILE)-aout.txt: $(MESONCROSSFILE)-aout.txt.in
@@ -153,6 +156,8 @@ $(MESONCROSSFILE)-omf.txt: $(MESONCROSSFILE)-omf.txt.in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
+.PHONY: all-cmake
+all: all-cmake
 all-cmake: $(CMAKECROSSFILE)
 	$(MKDIR_P) $(CMAKEDIR)/$(BUILDDIR)
 	cd $(CMAKEDIR)/$(BUILDDIR); \
@@ -165,12 +170,16 @@ $(CMAKECROSSFILE): $(CMAKECROSSFILE).in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
 
-install: install-binutils install-libc install-emxtools install-extras \
-         install-gcc install-meson install-cmake
+.PHONY: install
+install:
 
+.PHONY: install-binutils
+install: install-binutils
 install-binutils: all-binutils
 	$(MAKE) -C $(BINUTILSDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
 
+.PHONY: install-libc
+install: install-libc
 install-libc: all-libc
 	$(INSTALL) -d $(DESTDIR)$(TARGETPREFIX)
 	$(CP) -a "$(LIBCZIPDIR)/@unixroot/usr/include" \
@@ -183,10 +192,14 @@ install-libc: all-libc
 	$(RM) $(DESTDIR)$(TARGETPREFIX)/usr/lib
 	$(LN_S) ../lib $(DESTDIR)$(TARGETPREFIX)/usr/lib
 
+.PHONY: install-emxtools
+install: install-emxtools
 install-emxtools: all-emxtools
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross install \
 	  DESTDIR=$(DESTDIR) PREFIXROOT=$(PREFIXROOT)
 
+.PHONY: install-extras
+install: install-extras
 install-extras:
 	$(INSTALL) -d $(DESTDIR)$(TARGETBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
@@ -200,22 +213,29 @@ install-extras:
 	  fi; \
 	done
 
+.PHONY: install-gcc
+install: install-gcc
 install-gcc: all-gcc
 	$(MAKE) -C $(GCCDIR)/$(BUILDDIR) DESTDIR=$(DESTDIR) \
 	           install-gcc install-target-libgcc install-target-libstdc++-v3 \
 	           install-target-libssp
 
+.PHONY: install-meson
+install: install-meson
 install-meson: all-meson
 	$(INSTALLDATA) -D $(MESONCROSSFILE)-aout.txt \
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE)-aout.txt)
 	$(INSTALLDATA) -D $(MESONCROSSFILE)-omf.txt \
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE)-omf.txt)
 
+.PHONY: install-cmake
+install: install-cmake
 install-cmake: all-cmake
 	$(INSTALLDATA) -D $(CMAKECROSSFILE) \
 	  $(DESTDIR)$(SHAREDIR)/cmake/cross/$(notdir $(CMAKECROSSFILE))
 	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR) install DESTDIR=$(DESTDIR)
 
+.PHONY: dist
 dist:
 	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
 	prefixroot=$(patsubst %/,%,$(PREFIXROOT)); \
@@ -238,29 +258,42 @@ dist:
 	$(TAR) $(TARFLAGS) $(TARBALL) $(PACKAGE)-$(VERSION); \
 	$(RM) -r $(PACKAGE)-$(VERSION)
 
-clean: clean-binutils clean-libc clean-emxtools clean-gcc clean-meson \
-       clean-cmake clean-autotools
+.PHONY: clean
+clean:
 	$(RM) $(TARBALL)
 
+.PHONY: clean-autotools
+clean: clean-autotools
+clean-autotools:
+	$(RM) -r $(AUTOTOOLSDIR)
+
+.PHONY: clean-binutils
+clean: clean-binutils
 clean-binutils:
 	$(RM) -r $(BINUTILSDIR)/$(BUILDDIR)
 
+.PHONY: clean-libc
+clean: clean-libc
 clean-libc:
 	$(RM) -r $(LIBCZIPDIR)
 
+.PHONY: clean-emxtools
+clean: clean-emxtools
 clean-emxtools:
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross clean
 
+.PHONY: clean-gcc
+clean: clean-gcc
 clean-gcc:
 	$(RM) -r $(GCCDIR)/$(BUILDDIR)
 
+.PHONY: clean-meson
+clean: clean-meson
 clean-meson:
 	$(RM) $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt
 
+.PHONY: clean-cmake
+clean: clean-cmake
 clean-cmake:
 	$(RM) $(CMAKECROSSFILE)
 	$(RM) -r $(CMAKEDIR)/$(BUILDDIR)
-
-.PHONY: clean-autools
-clean-autotools:
-	$(RM) -r $(AUTOTOOLSDIR)
