@@ -3,9 +3,8 @@
 PACKAGE := cross-os2emx
 VERSION := $(shell git describe --abbrev=0)
 
-TAR := tar
-TARFLAGS := cvzf
-TARXFLAGS := xvzf
+TARC := tar cvzf
+TARX := tar xvzf
 TARBALL := $(PACKAGE)-$(VERSION).tar.gz
 
 # Directory where cross-os2emx will be installed.
@@ -74,7 +73,7 @@ all-autotools: all-autotools-autoconf
 all-autotools-autoconf: $(AUTOTOOLSDIR)/autoconf.done
 $(AUTOTOOLSDIR)/autoconf.done: $(AUTOTOOLSDIR)/$(AUTOCONFTGZ)
 	cd $(AUTOTOOLSDIR); \
-	$(TAR) $(TARXFLAGS) $(AUTOCONFTGZ) || exit 1; \
+	$(TARX) $(AUTOCONFTGZ) || exit 1; \
 	cd $(AUTOCONFTGZ:.tar.gz=); \
 	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
 	$(TOUCH) $@
@@ -88,7 +87,7 @@ all-autotools: all-autotools-automake
 all-autotools-automake: $(AUTOTOOLSDIR)/automake.done
 $(AUTOTOOLSDIR)/automake.done: $(AUTOTOOLSDIR)/$(AUTOMAKETGZ)
 	cd $(AUTOTOOLSDIR); \
-	$(TAR) $(TARXFLAGS) $(AUTOMAKETGZ) || exit 1; \
+	$(TARX) $(AUTOMAKETGZ) || exit 1; \
 	cd $(AUTOMAKETGZ:.tar.gz=); \
 	./configure --prefix=$$(dirname $$PWD) && $(MAKE) && $(MAKE) install
 	$(TOUCH) $@
@@ -102,7 +101,7 @@ all-autotools: all-autotools-libtool
 all-autotools-libtool: $(AUTOTOOLSDIR)/libtool.done
 $(AUTOTOOLSDIR)/libtool.done: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
 	test -f $(LIBTOOLDIR)/configure \
-	  || ( cd $(AUTOTOOLSDIR); $(TAR) $(TARXFLAGS) $(LIBTOOLTGZ); ) \
+	  || ( cd $(AUTOTOOLSDIR); $(TARX) $(LIBTOOLTGZ); ) \
 	  || exit 1;
 	$(MKDIR_P) $(LIBTOOLDIR)/$(BUILDDIR)
 	cd $(LIBTOOLDIR)/$(BUILDDIR); \
@@ -188,7 +187,7 @@ all: all-libtool
 all-libtool: $(AUTOTOOLSDIR)/all-libtool.done
 $(AUTOTOOLSDIR)/all-libtool.done: $(AUTOTOOLSDIR)/$(LIBTOOLTGZ)
 	test -f $(LIBTOOLDIR)/configure \
-	  || ( cd $(AUTOTOOLSDIR); $(TAR) $(TARXFLAGS) $(LIBTOOLTGZ); ) \
+	  || ( cd $(AUTOTOOLSDIR); $(TARX) $(LIBTOOLTGZ); ) \
 	  || exit 1;
 	$(MKDIR_P) $(LIBTOOLDIR)/$(BUILDDIR).all-libtool
 	cd $(LIBTOOLDIR)/$(BUILDDIR).all-libtool; \
@@ -286,7 +285,7 @@ dist:
 	$(CP) README.md $$destdir && \
 	{ test -z "$$prefixrootfirst" || $(RM) -r $$destdir$$prefixrootfirst; }; \
 	$(RM) $(TARBALL); \
-	$(TAR) $(TARFLAGS) $(TARBALL) $(PACKAGE)-$(VERSION); \
+	$(TARC) $(TARBALL) $(PACKAGE)-$(VERSION); \
 	$(RM) -r $(PACKAGE)-$(VERSION)
 
 .PHONY: clean
