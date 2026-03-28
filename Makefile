@@ -36,6 +36,7 @@ LN_S := ln -s
 MV := mv
 SED := sed
 TOUCH := touch
+PATCH := patch
 
 AUTOTOOLSDIR := autotools
 AUTOCONFTGZ := autoconf-2.69.tar.gz
@@ -58,6 +59,7 @@ CMAKECROSSFILE := cmake/$(TARGETSPEC).cmake
 LIBCZIP := libc-0_1_14-1_oc00.zip
 LIBCZIPURL := https://rpm.netlabs.org/release/00/zip/$(LIBCZIP)
 LIBCZIPDIR := libc-$(TARGETSPEC)
+LIBCFENVHDIFF := patches/libc/fenv.h.diff
 
 BUILDDIR := build
 
@@ -128,6 +130,8 @@ all: all-libc
 all-libc: $(LIBCZIPDIR)/libc.done
 $(LIBCZIPDIR)/libc.done: $(LIBCZIPDIR)/$(LIBCZIP)
 	$(UNZIP) $(LIBCZIPDIR)/$(LIBCZIP) -d $(LIBCZIPDIR)
+	fenvhdiff=$$(realpath $(LIBCFENVHDIFF)); \
+	cd $(LIBCZIPDIR); $(PATCH) --binary -p0 -N < $$fenvhdiff
 	$(TOUCH) $@
 
 $(LIBCZIPDIR)/$(LIBCZIP):

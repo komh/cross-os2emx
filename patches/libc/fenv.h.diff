@@ -1,0 +1,13 @@
+diff -uNr  @unixroot/usr/include/fenv.h @unixroot/usr/include/fenv.h.my
+--- @unixroot/usr/include/fenv.h	2026-01-11 16:48:24.000000000 +0000
++++ @unixroot/usr/include/fenv.h.my	2026-03-28 21:38:50.000000000 +0000
+@@ -83,7 +83,9 @@
+ /* After testing for SSE support once, we cache the result in __has_sse. */
+ enum __sse_support { __SSE_YES, __SSE_NO, __SSE_UNK };
+ extern enum __sse_support __has_sse;
++__BEGIN_DECLS
+ int __test_sse(void);
++__END_DECLS
+ #ifdef __SSE__
+ #define	__HAS_SSE()	1
+ #else

@@ -15,7 +15,7 @@ for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
   if test "$sub" = "libc" ; then
     gitam_opt="$gitam_opt --keep-cr"
   fi
-  ( cd $sub && git am $gitam_opt ../patches/$sub/* ) || exit 1
+  ( cd $sub && git am $gitam_opt ../patches/$sub/*.patch ) || exit 1
 
   if test -f $sub/autogen.sh ; then
     echo "Bootstrapping $sub..."
