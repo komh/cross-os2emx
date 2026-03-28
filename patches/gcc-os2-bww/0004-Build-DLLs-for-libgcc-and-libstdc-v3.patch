@@ -1,18 +1,18 @@
-From ac1c744c123b15f790e4579e97554d6db3bd1d54 Mon Sep 17 00:00:00 2001
+From 1166e1cf2950842dbd10d68745ba32ceaf9de812 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
-Date: Thu, 19 Mar 2026 23:34:08 +0900
-Subject: [PATCH 4/7] Build DLLs for libgcc and libstdc++-v3
+Date: Sun, 1 Mar 2026 01:58:29 +0900
+Subject: [PATCH 4/5] Build DLLs for libgcc and libstdc++-v3
 
 ---
  conf-cross-os2emx            |  2 +-
  config/lthostflags.m4        |  3 +++
  libgcc/config/i386/t-emx     | 10 +++++-----
  libstdc++-v3/configure.host  |  1 +
- libstdc++-v3/src/Makefile.am |  4 +++-
- 5 files changed, 13 insertions(+), 7 deletions(-)
+ libstdc++-v3/src/Makefile.am |  2 +-
+ 5 files changed, 11 insertions(+), 7 deletions(-)
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
-index 0cb6810c21..37c1053a19 100755
+index 0cb6810c2..37c1053a1 100755
 --- a/conf-cross-os2emx
 +++ b/conf-cross-os2emx
 @@ -16,6 +16,7 @@ opts="
@@ -32,7 +32,7 @@ index 0cb6810c21..37c1053a19 100755
  "
  
 diff --git a/config/lthostflags.m4 b/config/lthostflags.m4
-index bc0f59ee79..ec3157e5d4 100644
+index bc0f59ee7..ec3157e5d 100644
 --- a/config/lthostflags.m4
 +++ b/config/lthostflags.m4
 @@ -24,6 +24,9 @@ case $host in
@@ -46,7 +46,7 @@ index bc0f59ee79..ec3157e5d4 100644
      lt_host_flags=[$1]
      ;;
 diff --git a/libgcc/config/i386/t-emx b/libgcc/config/i386/t-emx
-index 38558d3e10..670c17d388 100644
+index 4fb023611..bb419f3a3 100644
 --- a/libgcc/config/i386/t-emx
 +++ b/libgcc/config/i386/t-emx
 @@ -20,13 +20,13 @@ SHLIB_BASENAME  = gcc$(SHLIB_SOVERSION)
@@ -69,10 +69,10 @@ index 38558d3e10..670c17d388 100644
  SHLIB_SUBDIR    = .
  SHLIB_INSTALL   = $(INSTALL_DATA) $(SHLIB_SUBDIR)/$(SHLIB_DLLNAME) $(DESTDIR)$(slibdir)/ \
 diff --git a/libstdc++-v3/configure.host b/libstdc++-v3/configure.host
-index 656675893f..4378e00e49 100644
+index 24205eb5f..79348fdfd 100644
 --- a/libstdc++-v3/configure.host
 +++ b/libstdc++-v3/configure.host
-@@ -301,6 +301,7 @@ case "${host_os}" in
+@@ -297,6 +297,7 @@ case "${host_os}" in
      ;;
    os2*)
      os_include_dir="os/os2"
@@ -81,21 +81,18 @@ index 656675893f..4378e00e49 100644
    qnx6.[12]*)
      os_include_dir="os/qnx/qnx6.1"
 diff --git a/libstdc++-v3/src/Makefile.am b/libstdc++-v3/src/Makefile.am
-index dd31e5b2f6..d75cf6ee84 100644
+index 2ebf056c4..b4dc9732a 100644
 --- a/libstdc++-v3/src/Makefile.am
 +++ b/libstdc++-v3/src/Makefile.am
-@@ -160,8 +160,10 @@ libstdc___darwin_rpath = -Wc,-nodefaultrpaths
- libstdc___darwin_rpath += -Wl,-rpath,@loader_path
+@@ -34,7 +34,7 @@ SUBDIRS = c++98 c++11 c++17 $(filesystem_dir)
+ if OS_OS2
+ ## Force the DLL to be stdcppX.DLL instead of stdc++.dll for backward
+ ## compatibility and to avoid dangerous symbols in the file name.
+-short_name = -shortname stdcpp
++short_name = -os2dllname stdcpp
  endif
  
-+## On OS/2, force the DLL to be stdcppX.DLL instead of stdc++.dll for backward
-+## compatibility and to avoid dangerous symbols in the file name.
- libstdc___la_LDFLAGS = \
--	-version-info $(libtool_VERSION) ${version_arg} -lm $(libstdc___darwin_rpath)
-+	-version-info $(libtool_VERSION) ${version_arg} -lm $(libstdc___darwin_rpath) -os2dllname stdcpp
- 
- libstdc___la_LINK = $(CXXLINK) $(libstdc___la_LDFLAGS) $(lt_host_flags)
- 
+ # Cross compiler support.
 -- 
-2.43.0
+2.28.0
 

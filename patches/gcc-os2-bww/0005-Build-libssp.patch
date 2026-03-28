@@ -1,7 +1,7 @@
-From 7ae409fc6a6731a80cb5f4f4145a8e892b52bb22 Mon Sep 17 00:00:00 2001
+From 33fd2708ddae9042dd93080c3d5d83b76772dab6 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 1 Mar 2026 18:34:46 +0900
-Subject: [PATCH 5/7] Build libssp
+Subject: [PATCH 5/5] Build libssp
 
 ---
  conf-cross-os2emx | 1 -
@@ -9,7 +9,7 @@ Subject: [PATCH 5/7] Build libssp
  2 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
-index 37c1053a19..dd565bf88f 100755
+index 37c1053a1..dd565bf88 100755
 --- a/conf-cross-os2emx
 +++ b/conf-cross-os2emx
 @@ -22,7 +22,6 @@ opts="
@@ -21,21 +21,18 @@ index 37c1053a19..dd565bf88f 100755
      --disable-multilib
      --disable-lto
 diff --git a/mk-cross-os2emx b/mk-cross-os2emx
-index 843266240c..d20560e3eb 100755
+index 3013ea91e..9bdea141d 100755
 --- a/mk-cross-os2emx
 +++ b/mk-cross-os2emx
-@@ -3,9 +3,11 @@
- make all-gcc \
-      all-target-libgcc \
-      all-target-libstdc++-v3 \
-+     all-target-libssp \
-      "$@" || exit 1
- 
- make install-gcc \
-      install-target-libgcc \
-      install-target-libstdc++-v3 \
-+     install-target-libssp \
-      "$@"
+@@ -3,6 +3,8 @@
+ make all-gcc &&
+ make all-target-libgcc &&
+ make all-target-libstdc++-v3 &&
++make all-target-libssp &&
+ make install-gcc &&
+ make install-target-libgcc &&
+ make install-target-libstdc++-v3 &&
++make install-target-libssp
 -- 
-2.43.0
+2.28.0
 

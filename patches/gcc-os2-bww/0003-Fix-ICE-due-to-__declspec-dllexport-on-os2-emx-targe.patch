@@ -1,24 +1,24 @@
-From 76ff3a90a21e4890547b9355fdd495da9b231c28 Mon Sep 17 00:00:00 2001
+From 6b5f6445f7d0c6bd3e45c629ef10d6189383ed52 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sat, 28 Feb 2026 00:07:14 +0900
-Subject: [PATCH 3/7] Fix ICE due to __declspec(dllexport) on *-os2-emx target
+Subject: [PATCH 3/5] Fix ICE due to __declspec(dllexport) on *-os2-emx target
 
 ---
  gcc/config/i386/emx.c | 5 +++++
  1 file changed, 5 insertions(+)
 
 diff --git a/gcc/config/i386/emx.c b/gcc/config/i386/emx.c
-index a7d1e8c816..bf5bf69b84 100644
+index 93c938d09..b84dd9208 100644
 --- a/gcc/config/i386/emx.c
 +++ b/gcc/config/i386/emx.c
-@@ -733,9 +733,14 @@ i386_emx_file_end (void)
+@@ -724,9 +724,14 @@ i386_emx_file_end (void)
                    continue;
                  }
                 */
 +#ifdef __EMX__
-+	      /* komh: This causes ICE in
-+		 langhooks.c:lhd_set_decl_assembler_name () on EMX target if
-+		 __declspec(dllexport) is used.  */
++              /* komh: This causes ICE in
++                 langhooks.c:lhd_set_decl_assembler_name () on EMX target if
++                 __declspec(dllexport) is used.  */
                if (!q->asm_name)
                  q->asm_name = q->exported_name ? q->exported_name
                    : IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
@@ -27,5 +27,5 @@ index a7d1e8c816..bf5bf69b84 100644
            if (!q->asm_name)
              q->asm_name = q->exported_name ? q->exported_name : q->name;
 -- 
-2.43.0
+2.28.0
 

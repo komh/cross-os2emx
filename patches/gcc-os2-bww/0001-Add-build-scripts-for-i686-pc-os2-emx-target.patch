@@ -1,18 +1,18 @@
-From 02af42dfba6e5a6bc99a183d8bbcc76f0588c57e Mon Sep 17 00:00:00 2001
+From f18ad53b138a879ba73c23882af6250cc896ffc6 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 16:03:00 +0900
-Subject: [PATCH 1/7] Add build scripts for i686-pc-os2-emx target
+Subject: [PATCH 1/5] Add build scripts for i686-pc-os2-emx target
 
 ---
  conf-cross-os2emx | 32 ++++++++++++++++++++++++++++++++
- mk-cross-os2emx   | 11 +++++++++++
- 2 files changed, 43 insertions(+)
+ mk-cross-os2emx   |  8 ++++++++
+ 2 files changed, 40 insertions(+)
  create mode 100755 conf-cross-os2emx
  create mode 100755 mk-cross-os2emx
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
 new file mode 100755
-index 0000000000..0cb6810c21
+index 000000000..0cb6810c2
 --- /dev/null
 +++ b/conf-cross-os2emx
 @@ -0,0 +1,32 @@
@@ -50,21 +50,18 @@ index 0000000000..0cb6810c21
 +$(dirname $0)/configure $opts "$@"
 diff --git a/mk-cross-os2emx b/mk-cross-os2emx
 new file mode 100755
-index 0000000000..843266240c
+index 000000000..3013ea91e
 --- /dev/null
 +++ b/mk-cross-os2emx
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,8 @@
 +#!/bin/sh
 +
-+make all-gcc \
-+     all-target-libgcc \
-+     all-target-libstdc++-v3 \
-+     "$@" || exit 1
-+
-+make install-gcc \
-+     install-target-libgcc \
-+     install-target-libstdc++-v3 \
-+     "$@"
++make all-gcc &&
++make all-target-libgcc &&
++make all-target-libstdc++-v3 &&
++make install-gcc &&
++make install-target-libgcc &&
++make install-target-libstdc++-v3 &&
 -- 
-2.43.0
+2.28.0
 

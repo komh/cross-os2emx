@@ -2,3 +2,4 @@
 * text=auto !eol
 
 /patches/libc/* -text
+/patches/gcc-os2/* -text

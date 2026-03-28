@@ -1,7 +1,3 @@
-[submodule "gcc-os2"]
-	path = gcc-os2
-	url = https://github.com/bitwiseworks/gcc-os2.git
-	branch = master
 [submodule "libc"]
 	path = libc
 	url = https://github.com/bitwiseworks/libc.git
@@ -17,4 +13,12 @@
 	path = binutils-os2
 	url = https://github.com/psmedley/binutils-os2.git
 	branch = 2.44
+	shallow = true
+[submodule "gcc-os2-bww"]
+	path = gcc-os2-bww
+	url = https://github.com/bitwiseworks/gcc-os2.git
+[submodule "gcc-os2"]
+	path = gcc-os2
+	url = https://github.com/psmedley/gcc-os2.git
+	branch = gcc-15.x
 	shallow = true
