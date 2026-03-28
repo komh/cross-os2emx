@@ -1,7 +1,3 @@
-[submodule "binutils-os2"]
-	path = binutils-os2
-	url = https://github.com/bitwiseworks/binutils-os2.git
-	branch = master
 [submodule "gcc-os2"]
 	path = gcc-os2
 	url = https://github.com/bitwiseworks/gcc-os2.git
@@ -14,3 +10,11 @@
 	path = cmake-os2
 	url = https://github.com/bitwiseworks/cmake-os2.git
 	branch = master
+[submodule "binutils-os2-bww"]
+	path = binutils-os2-bww
+	url = https://github.com/bitwiseworks/binutils-os2.git
+[submodule "binutils-os2"]
+	path = binutils-os2
+	url = https://github.com/psmedley/binutils-os2.git
+	branch = 2.44
+	shallow = true
