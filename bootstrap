@@ -1,5 +1,11 @@
 #!/bin/sh
 
+echo "Preparing autotools for bootstrapping..."
+make all-autotools || exit 1
+echo
+
+export PATH=$(pwd)/autotools/bin:$PATH
+
 for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
   echo "Initializing submodule $sub..."
   git submodule update --init --recursive --force $sub || exit 1
@@ -10,6 +16,11 @@ for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
     gitam_opt="$gitam_opt --keep-cr"
   fi
   ( cd $sub && git am $gitam_opt ../patches/$sub/* ) || exit 1
+
+  if test -f $sub/autogen.sh ; then
+    echo "Bootstrapping $sub..."
+    ( cd $sub; chmod a+x autogen.sh; ./autogen.sh ) || exit 1
+  fi
 
   echo
 done

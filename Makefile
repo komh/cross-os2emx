@@ -118,9 +118,7 @@ all: all-binutils
 all-binutils: all-autotools
 	$(MKDIR_P) $(BINUTILSDIR)/$(BUILDDIR)
 	export PATH=$$PWD/$(AUTOTOOLSDIR)/bin:$$PATH; \
-    cd $(BINUTILSDIR); \
-	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
-	cd $(BUILDDIR); \
+    cd $(BINUTILSDIR)/$(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
 	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx || exit 1; \
 	$(MAKE)
@@ -149,7 +147,6 @@ all-gcc: all-autotools install-binutils install-libc install-emxtools \
 	export PATH=$$PWD/$(AUTOTOOLSDIR)/bin:$$PATH; \
 	cd $(GCCDIR); \
 	contrib/download_prerequisites || exit 1; \
-	test -f configure || { chmod a+x autogen.sh; ./autogen.sh; } || exit 1; \
 	cd $(BUILDDIR); \
 	test "$(FORCE_CONFIGURE)" = "" -a -f config.status || \
 	  PREFIXROOT=$(PREFIXROOT) ../conf-cross-os2emx || exit 1; \
