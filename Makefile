@@ -174,7 +174,7 @@ all-cmake: $(CMAKECROSSFILE)
 	$(MKDIR_P) $(CMAKEDIR)/$(BUILDDIR)
 	cd $(CMAKEDIR)/$(BUILDDIR); \
 	test -f Makefile || \
-	  ../configure --prefix=$(PREFIX);
+	  ../configure --prefix=$(PREFIX) || exit 1;
 	export PATH=$(DESTDIR)$(BINDIR):$(PATH); \
 	$(MAKE) -C $(CMAKEDIR)/$(BUILDDIR)
 
