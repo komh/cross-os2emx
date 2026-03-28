@@ -2,7 +2,7 @@
 
 for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
   echo "Initializing submodule $sub..."
-  git submodule update --init $sub || exit 1
+  git submodule update --init --recursive --force $sub || exit 1
 
   echo "Applying patches for $sub..."
   gitam_opt="-3"
