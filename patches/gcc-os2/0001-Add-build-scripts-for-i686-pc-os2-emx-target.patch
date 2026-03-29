@@ -1,21 +1,21 @@
-From 02af42dfba6e5a6bc99a183d8bbcc76f0588c57e Mon Sep 17 00:00:00 2001
+From 354c8afc7cb242a65fefbbfd78f5661a2a35ee35 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 16:03:00 +0900
 Subject: [PATCH 1/7] Add build scripts for i686-pc-os2-emx target
 
 ---
- conf-cross-os2emx | 32 ++++++++++++++++++++++++++++++++
+ conf-cross-os2emx | 33 +++++++++++++++++++++++++++++++++
  mk-cross-os2emx   | 11 +++++++++++
- 2 files changed, 43 insertions(+)
+ 2 files changed, 44 insertions(+)
  create mode 100755 conf-cross-os2emx
  create mode 100755 mk-cross-os2emx
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
 new file mode 100755
-index 0000000000..0cb6810c21
+index 0000000000..725ade7e0d
 --- /dev/null
 +++ b/conf-cross-os2emx
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +#! /bin/sh
 +
 +PREFIXROOT=${PREFIXROOT:=$HOME}
@@ -41,6 +41,7 @@ index 0000000000..0cb6810c21
 +    --disable-nls
 +    --disable-ssp
 +    --disable-libquadmath
++    --disable-libgomp
 +    --disable-multilib
 +    --disable-lto
 +    --disable-shared
