@@ -1,4 +1,4 @@
-From 7ae409fc6a6731a80cb5f4f4145a8e892b52bb22 Mon Sep 17 00:00:00 2001
+From 58352f01522e53ce36d7b1b75f618085a6beabf0 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 1 Mar 2026 18:34:46 +0900
 Subject: [PATCH 5/7] Build libssp
@@ -9,7 +9,7 @@ Subject: [PATCH 5/7] Build libssp
  2 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
-index 37c1053a19..dd565bf88f 100755
+index 04d18c5c08..a0f85e140a 100755
 --- a/conf-cross-os2emx
 +++ b/conf-cross-os2emx
 @@ -22,7 +22,6 @@ opts="
@@ -18,8 +18,8 @@ index 37c1053a19..dd565bf88f 100755
      --disable-nls
 -    --disable-ssp
      --disable-libquadmath
+     --disable-libgomp
      --disable-multilib
-     --disable-lto
 diff --git a/mk-cross-os2emx b/mk-cross-os2emx
 index 843266240c..d20560e3eb 100755
 --- a/mk-cross-os2emx

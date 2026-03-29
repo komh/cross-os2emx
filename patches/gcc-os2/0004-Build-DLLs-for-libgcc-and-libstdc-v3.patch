@@ -1,4 +1,4 @@
-From ac1c744c123b15f790e4579e97554d6db3bd1d54 Mon Sep 17 00:00:00 2001
+From 59defda39a82ab22d1a4c1c1e2977da249ca9f97 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Thu, 19 Mar 2026 23:34:08 +0900
 Subject: [PATCH 4/7] Build DLLs for libgcc and libstdc++-v3
@@ -12,7 +12,7 @@ Subject: [PATCH 4/7] Build DLLs for libgcc and libstdc++-v3
  5 files changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/conf-cross-os2emx b/conf-cross-os2emx
-index 0cb6810c21..37c1053a19 100755
+index 725ade7e0d..04d18c5c08 100755
 --- a/conf-cross-os2emx
 +++ b/conf-cross-os2emx
 @@ -16,6 +16,7 @@ opts="
@@ -23,8 +23,8 @@ index 0cb6810c21..37c1053a19 100755
      --enable-languages=c,c++
      --enable-threads
      --enable-checking=release
-@@ -25,7 +26,6 @@ opts="
-     --disable-libquadmath
+@@ -26,7 +27,6 @@ opts="
+     --disable-libgomp
      --disable-multilib
      --disable-lto
 -    --disable-shared

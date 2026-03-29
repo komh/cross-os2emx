@@ -1,4 +1,4 @@
-From b73983d3bc0acb7407e67ed9e44e26c778c7cc49 Mon Sep 17 00:00:00 2001
+From f67155fb02c918279eb70ea53d34d66d5e86c31e Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Tue, 24 Mar 2026 22:45:30 +0900
 Subject: [PATCH 7/7] Fix SIGSEGV when passing -Wl,--version

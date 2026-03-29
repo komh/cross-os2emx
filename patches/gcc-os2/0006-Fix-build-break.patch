@@ -1,4 +1,4 @@
-From 4e27715145e3080b2d721e0e7b8ffeaac71aa0b3 Mon Sep 17 00:00:00 2001
+From be23bdfc0f068c1ee1ac92eedeef14216c28d7a4 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Mar 2026 00:23:29 +0900
 Subject: [PATCH 6/7] Fix build break

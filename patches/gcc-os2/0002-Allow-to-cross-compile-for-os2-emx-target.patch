@@ -1,4 +1,4 @@
-From dd116c4da3605a6c80a71618378b82fcbbf62044 Mon Sep 17 00:00:00 2001
+From c7ce5a8614d87d8e55112b8982a25cc667171976 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Thu, 19 Mar 2026 23:17:02 +0900
 Subject: [PATCH 2/7] Allow to cross-compile for *-os2-emx target
