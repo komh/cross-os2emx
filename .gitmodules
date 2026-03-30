@@ -9,11 +9,6 @@
 [submodule "binutils-os2-bww"]
 	path = binutils-os2-bww
 	url = https://github.com/bitwiseworks/binutils-os2.git
-[submodule "binutils-os2"]
-	path = binutils-os2
-	url = https://github.com/psmedley/binutils-os2.git
-	branch = 2.44
-	shallow = true
 [submodule "gcc-os2-bww"]
 	path = gcc-os2-bww
 	url = https://github.com/bitwiseworks/gcc-os2.git
@@ -21,4 +16,9 @@
 	path = gcc-os2
 	url = https://github.com/psmedley/gcc-os2.git
 	branch = gcc-15.x
+	shallow = true
+[submodule "binutils-os2-ps"]
+	path = binutils-os2-ps
+	url = https://github.com/psmedley/binutils-os2.git
+	branch = 2.44
 	shallow = true

@@ -47,7 +47,7 @@ LIBTOOLTGZ := 2.5.4-os2-r2.tar.gz
 LIBTOOLTGZURL := https://github.com/komh/libtool-os2/archive/refs/tags/$(LIBTOOLTGZ)
 LIBTOOLDIR := $(AUTOTOOLSDIR)/libtool-os2-$(LIBTOOLTGZ:.tar.gz=)
 
-BINUTILSDIR := binutils-os2
+BINUTILSDIR := binutils-os2-ps
 LIBCDIR := libc
 GCCDIR := gcc-os2
 EMXDIR := $(LIBCDIR)/src/emx
