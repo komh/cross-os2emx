@@ -49,7 +49,7 @@ LIBTOOLDIR := $(AUTOTOOLSDIR)/libtool-os2-$(LIBTOOLTGZ:.tar.gz=)
 
 BINUTILSDIR := binutils-os2-ps
 LIBCDIR := libc
-GCCDIR := gcc-os2
+GCCDIR := gcc-os2-ps
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 CMAKEDIR := cmake-os2
