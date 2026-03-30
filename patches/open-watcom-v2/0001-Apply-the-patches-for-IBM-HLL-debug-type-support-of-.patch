@@ -1,8 +1,8 @@
-From daa6ee441918d70e04446c1d03a47502ff28d1ba Mon Sep 17 00:00:00 2001
+From 9f3eecd26d550a6510e07828aed010e28a60e98d Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sat, 14 Mar 2026 18:47:20 +0900
-Subject: [PATCH] Apply the patches for IBM HLL debug type support of v1.9 to
- v2 fork
+Subject: [PATCH 1/2] Apply the patches for IBM HLL debug type support of v1.9
+ to v2 fork
 
 ---
  bld/dig/h/diphndls.h       |   2 +-
@@ -2353,5 +2353,5 @@ index ca29c4c80e..fd6f352c82 100644
      }
      info->len = head.offset;
 -- 
-2.28.0
+2.43.0
 

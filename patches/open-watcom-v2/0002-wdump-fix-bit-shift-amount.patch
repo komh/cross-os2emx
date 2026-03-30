@@ -1,0 +1,31 @@
+From 2f7381741be86c7970b6271154c28f7952581433 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Tue, 31 Mar 2026 08:36:09 +0900
+Subject: [PATCH 2/2] wdump: fix bit shift amount
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Shifting a 16-bit variable by 16 bits is incorrect.
+
+Reported by Jochen Schäfer.
+---
+ bld/exedump/c/dumphll.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bld/exedump/c/dumphll.c b/bld/exedump/c/dumphll.c
+index e74fe9f654..7917483e81 100644
+--- a/bld/exedump/c/dumphll.c
++++ b/bld/exedump/c/dumphll.c
+@@ -438,7 +438,7 @@ static unsigned_8 *put_name2( unsigned_8 *p)
+     unsigned_16 len;
+     len = *p++;
+     if( len & 0x80 ) {
+-        len = ((len & 0x7f) << 16) | *p;
++        len = ((len & 0x7f) << 8) | *p;
+         p++;
+     }
+     else
+-- 
+2.43.0
+
