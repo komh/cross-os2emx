@@ -1,7 +1,7 @@
-From be23bdfc0f068c1ee1ac92eedeef14216c28d7a4 Mon Sep 17 00:00:00 2001
+From 958a8c136a6f5555d7dc8de4c4f4e3c9b881d3d3 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Mar 2026 00:23:29 +0900
-Subject: [PATCH 6/7] Fix build break
+Subject: [PATCH 6/8] Fix build break
 
 1. Add autogen.sh
 

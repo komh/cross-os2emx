@@ -1,0 +1,74 @@
+From bf2cfc0dbebe7de968ac2472a51cc182e44e0640 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Wed, 1 Apr 2026 23:47:55 +0900
+Subject: [PATCH 8/8] Add GCCOPT env var support
+
+---
+ gcc/gcc.cc | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/gcc.cc b/gcc/gcc.cc
+index 2ec357a93c..cece305ac9 100644
+--- a/gcc/gcc.cc
++++ b/gcc/gcc.cc
+@@ -8326,6 +8326,48 @@ driver::~driver ()
+   XDELETEVEC (decoded_options);
+ }
+ 
++#if defined(EMX) && !defined(__EMX__)
++static void
++_envargs (int *argcp, char ***argvp, const char *name)
++{
++  int argc = *argcp;
++  char **argv = *argvp;
++  int envargc;
++  char **envargv;
++  const char *envopt = env.get (name);
++  int newargc;
++  char **newargv;
++  int i;
++
++  if (envopt == NULL || *envopt == 0)
++    return;
++
++  envargv = buildargv (envopt);
++  if (envargv == NULL)
++    return;
++
++  envargc = countargv (envargv);
++
++  newargc = argc + envargc;
++  newargv = (char **) xmalloc (sizeof (char *) * (newargc + 1));
++
++  newargv[0] = argv[0];
++
++  /* Copy args from env first */
++  for (i = 0; i < envargc; i++)
++    newargv[1 + i] = envargv[i];
++
++  /* Copy args from argv now */
++  for (i = 1; i < argc; i++)
++    newargv[envargc + i] = argv[i];
++
++  /* FIXME: envargv leaks */
++
++  *argcp = newargc;
++  *argvp = newargv;
++}
++#endif
++
+ /* driver::main is implemented as a series of driver:: method calls.  */
+ 
+ int
+@@ -8333,7 +8375,7 @@ driver::main (int argc, char **argv)
+ {
+   bool early_exit;
+   set_progname (argv[0]);
+-#ifdef __EMX__
++#if defined(__EMX__) || defined(EMX)
+   /* No one is using it nowadays, perhaps it should go away (dangerous).  */
+   _envargs (&argc, &argv, "GCCOPT");
+ #endif
+-- 
+2.43.0
+

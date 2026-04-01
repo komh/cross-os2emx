@@ -1,7 +1,7 @@
-From c7ce5a8614d87d8e55112b8982a25cc667171976 Mon Sep 17 00:00:00 2001
+From 46a8d6efb43d402c33751f14cdc484ee4e736972 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Thu, 19 Mar 2026 23:17:02 +0900
-Subject: [PATCH 2/7] Allow to cross-compile for *-os2-emx target
+Subject: [PATCH 2/8] Allow to cross-compile for *-os2-emx target
 
 ---
  gcc/Makefile.in                 |  2 +-

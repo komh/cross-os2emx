@@ -1,7 +1,7 @@
-From f67155fb02c918279eb70ea53d34d66d5e86c31e Mon Sep 17 00:00:00 2001
+From d108a2274bb983c5b0261355b5533c7368ade9c0 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Tue, 24 Mar 2026 22:45:30 +0900
-Subject: [PATCH 7/7] Fix SIGSEGV when passing -Wl,--version
+Subject: [PATCH 7/8] Fix SIGSEGV when passing -Wl,--version
 
 This causes the linker detection of meson to fail
 ---
