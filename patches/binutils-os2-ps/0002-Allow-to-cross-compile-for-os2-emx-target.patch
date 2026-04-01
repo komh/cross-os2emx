@@ -1,7 +1,7 @@
-From 87a236bd1e03d510287978148bba2d91c7c056e4 Mon Sep 17 00:00:00 2001
+From eced0778bbc7a1780592bb0d184f4730be52aede Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 14:59:32 +0900
-Subject: [PATCH 2/3] Allow to cross-compile for *-os2-emx target
+Subject: [PATCH 2/4] Allow to cross-compile for *-os2-emx target
 
 ---
  bfd/i386aoutemx.c   |  2 +-
@@ -11,7 +11,7 @@ Subject: [PATCH 2/3] Allow to cross-compile for *-os2-emx target
  4 files changed, 53 insertions(+), 5 deletions(-)
 
 diff --git a/bfd/i386aoutemx.c b/bfd/i386aoutemx.c
-index 52ed3c7b9..0a75a9ba1 100644
+index 52ed3c7b..0a75a9ba 100644
 --- a/bfd/i386aoutemx.c
 +++ b/bfd/i386aoutemx.c
 @@ -163,7 +163,7 @@ static const struct aout_backend_data MY(backend_data) = {
@@ -24,7 +24,7 @@ index 52ed3c7b9..0a75a9ba1 100644
  int _fseek_hdr (FILE *stream)
  {
 diff --git a/gas/as.c b/gas/as.c
-index f9de21161..b55e92f79 100644
+index f9de2116..b55e92f7 100644
 --- a/gas/as.c
 +++ b/gas/as.c
 @@ -55,8 +55,10 @@
@@ -117,7 +117,7 @@ index f9de21161..b55e92f79 100644
        if (rc < 0)
          as_fatal ("cannot run emxomf");
 diff --git a/gas/config/te-emx.h b/gas/config/te-emx.h
-index a219ba8a2..0af805997 100644
+index a219ba8a..0af80599 100644
 --- a/gas/config/te-emx.h
 +++ b/gas/config/te-emx.h
 @@ -1,8 +1,10 @@
@@ -132,7 +132,7 @@ index a219ba8a2..0af805997 100644
  
  #if 0
 diff --git a/gas/output-file.c b/gas/output-file.c
-index 724edd630..489d13c06 100644
+index 724edd63..489d13c0 100644
 --- a/gas/output-file.c
 +++ b/gas/output-file.c
 @@ -103,7 +103,7 @@ output_file_close (void)

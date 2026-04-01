@@ -1,7 +1,7 @@
-From 680b9c602953ff653d8bd96ec6b9c4a82436edfe Mon Sep 17 00:00:00 2001
+From ae612d0e2c4be3eac8f7c4c8d6d483e25ebcaa61 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Wed, 25 Mar 2026 19:42:23 +0900
-Subject: [PATCH 3/3] Fix build break and clean up
+Subject: [PATCH 3/4] Fix build break and clean up
 
 1. chmod a+x autogen.sh
 
@@ -30,7 +30,7 @@ Subject: [PATCH 3/3] Fix build break and clean up
 
 diff --git a/Makefile.in b/Makefile.in
 new file mode 100644
-index 000000000..3951e6d34
+index 00000000..3951e6d3
 --- /dev/null
 +++ b/Makefile.in
 @@ -0,0 +1,68148 @@
@@ -68187,7 +68187,7 @@ old mode 100644
 new mode 100755
 diff --git a/binutils/config.rpath b/binutils/config.rpath
 new file mode 100755
-index 000000000..fa24bfc2d
+index 00000000..fa24bfc2
 --- /dev/null
 +++ b/binutils/config.rpath
 @@ -0,0 +1,548 @@
@@ -68741,7 +68741,7 @@ index 000000000..fa24bfc2d
 +EOF
 diff --git a/etc/configure.in b/etc/configure.in
 deleted file mode 100644
-index 0e39559aa..000000000
+index 0e39559a..00000000
 --- a/etc/configure.in
 +++ /dev/null
 @@ -1,26 +0,0 @@
@@ -68772,7 +68772,7 @@ index 0e39559aa..000000000
 -
 -AC_OUTPUT(Makefile)
 diff --git a/intl/configure.ac b/intl/configure.ac
-index b459b846b..7724baf3f 100644
+index b459b846..7724baf3 100644
 --- a/intl/configure.ac
 +++ b/intl/configure.ac
 @@ -5,7 +5,7 @@ AC_CONFIG_HEADER(config.h)

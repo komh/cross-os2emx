@@ -1,0 +1,80 @@
+From c9c8a1e3080ccac358bd4bf2121b6a3c70b310c7 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Wed, 1 Apr 2026 23:53:47 +0900
+Subject: [PATCH 4/4] Add GASOPT env var support
+
+---
+ gas/as.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/gas/as.c b/gas/as.c
+index b55e92f7..0ac180d7 100644
+--- a/gas/as.c
++++ b/gas/as.c
+@@ -1408,7 +1408,7 @@ gas_init (void)
+ 
+ #ifdef __EMX__
+ #define EXEEXT ".exe"
+-#else
++#elif defined(EMX)
+ #include <sys/wait.h>
+ 
+ #define EXEEXT ""
+@@ -1448,6 +1448,45 @@ static int spawnvp (int mode, const char *name, char * const argv[])
+   /* possible? */
+   return -1;
+ }
++
++static void _envargs (int *argcp, char ***argvp, const char *name)
++{
++  int argc = *argcp;
++  char **argv = *argvp;
++  int envargc;
++  char **envargv;
++  const char *envopt = getenv (name);
++  int newargc;
++  char **newargv;
++  int i;
++
++  if (envopt == NULL || *envopt == 0)
++    return;
++
++  envargv = buildargv (envopt);
++  if (envargv == NULL)
++    return;
++
++  envargc = countargv (envargv);
++
++  newargc = argc + envargc;
++  newargv = xmalloc (sizeof (char *) * (newargc + 1));
++
++  newargv[0] = argv[0];
++
++  /* Copy args from env first */
++  for (i = 0; i < envargc; i++)
++    newargv[1 + i] = envargv[i];
++
++  /* Copy args from argv now */
++  for (i = 1; i < argc; i++)
++    newargv[envargc + i] = argv[i];
++
++  /* FIXME: envargv leaks */
++
++  *argcp = newargc;
++  *argvp = newargv;
++}
+ #endif
+ 
+ int
+@@ -1461,6 +1500,8 @@ main (int argc, char ** argv)
+   _envargs (&argc, &argv, "GASOPT");
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
++#elif defined(EMX)
++  _envargs (&argc, &argv, "GASOPT");
+ #endif /* __EMX__ */
+ 
+   gas_early_init (&argc, &argv);
+-- 
+2.43.0
+
