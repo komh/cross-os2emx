@@ -1,7 +1,7 @@
-From 260c5eb4fee650ac156745d49c51a73aeeac3875 Mon Sep 17 00:00:00 2001
+From 8f3c085122eded4b5b395f13edbcfc09e7711e73 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 22 Mar 2026 20:20:20 +0900
-Subject: [PATCH 4/4] Add response file support
+Subject: [PATCH 4/5] Add response file support
 
 ---
  src/emx/src/emxexp/emxexp.c        | 2 ++

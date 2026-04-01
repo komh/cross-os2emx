@@ -1,0 +1,146 @@
+From 357d6bf5226c01723ca49033ca45256d1ea39617 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Wed, 1 Apr 2026 23:19:39 +0900
+Subject: [PATCH 5/5] Implement _envargs()
+
+---
+ src/emx/src/emxbind/Makefile.cross     |  2 ++
+ src/emx/src/emxomf/emxomf.c            |  2 ++
+ src/emx/src/emxomf/emxomfstrip.c       |  2 +-
+ src/emx/src/libcrossemx/Makefile.cross |  2 ++
+ src/emx/src/libcrossemx/crossemx.c     | 40 ++++++++++++++++++++++++++
+ src/emx/src/libcrossemx/crossemx.h     |  1 +
+ 6 files changed, 48 insertions(+), 1 deletion(-)
+
+diff --git a/src/emx/src/emxbind/Makefile.cross b/src/emx/src/emxbind/Makefile.cross
+index fc7fce4..b57037a 100644
+--- a/src/emx/src/emxbind/Makefile.cross
++++ b/src/emx/src/emxbind/Makefile.cross
+@@ -26,6 +26,8 @@
+ EMXDIR := ../..
+ SRCDIR := .
+ 
++BINUTILSDIR := ../../../../../binutils-os2
++
+ TARGETEXES := emxbind
+ 
+ emxbind_SRCS := cmd.c emxbind.c exec.c export.c fixup.c map.c resource.c \
+diff --git a/src/emx/src/emxomf/emxomf.c b/src/emx/src/emxomf/emxomf.c
+index 4b4268e..7e0893b 100644
+--- a/src/emx/src/emxomf/emxomf.c
++++ b/src/emx/src/emxomf/emxomf.c
+@@ -4166,12 +4166,14 @@ int main (int argc, char *argv[])
+      GCCLOAD environment variable. */
+ 
+   _emxload_env ("GCCLOAD");
++#endif
+ 
+   /* Get options from the EMXOMFOPT environment variable, expand
+      response files (@filename) and wildcard (*.o) on the command
+      line. */
+ 
+   _envargs (&argc, &argv, "EMXOMFOPT");
++#ifdef __EMX__
+   _response (&argc, &argv);
+   _wildcard (&argc, &argv);
+ #else
+diff --git a/src/emx/src/emxomf/emxomfstrip.c b/src/emx/src/emxomf/emxomfstrip.c
+index 0ce8a38..4f16385 100644
+--- a/src/emx/src/emxomf/emxomfstrip.c
++++ b/src/emx/src/emxomf/emxomfstrip.c
+@@ -295,8 +295,8 @@ int main(int argc, char **argv)
+ #endif
+ 
+     /* Get more arguments from EMXOMFSTRIPOPT and load reponse files and expand wildcards. */
+-#ifdef __EMX__
+     _envargs(&argc, &argv, "EMXOMFSTRIPOPT");
++#ifdef __EMX__
+     _response(&argc, &argv);
+     _wildcard(&argc, &argv);
+ #else
+diff --git a/src/emx/src/libcrossemx/Makefile.cross b/src/emx/src/libcrossemx/Makefile.cross
+index d918aa2..11eea76 100644
+--- a/src/emx/src/libcrossemx/Makefile.cross
++++ b/src/emx/src/libcrossemx/Makefile.cross
+@@ -26,6 +26,8 @@
+ EMXDIR := ../..
+ SRCDIR := .
+ 
++BINUTILSDIR := ../../../../../binutils-os2
++
+ TARGETLIBS := libcrossemx
+ 
+ libcrossemx_SRCS := crossemx.c
+diff --git a/src/emx/src/libcrossemx/crossemx.c b/src/emx/src/libcrossemx/crossemx.c
+index faf05a0..f691fcc 100644
+--- a/src/emx/src/libcrossemx/crossemx.c
++++ b/src/emx/src/libcrossemx/crossemx.c
+@@ -30,6 +30,7 @@ Boston, MA 02111-1307, USA.  */
+ #include <sys/param.h>
+ #include <sys/wait.h>
+ #include <errno.h>
++#include <libiberty.h>
+ 
+ #include "crossemx.h"
+ 
+@@ -311,6 +312,45 @@ int _fullpath (char *dst, const char *src, int size)
+   return 0;
+ }
+ 
++void _envargs (int *argcp, char ***argvp, const char *name)
++{
++  int argc = *argcp;
++  char **argv = *argvp;
++  int envargc;
++  char **envargv;
++  const char *envopt = getenv (name);
++  int newargc;
++  char **newargv;
++  int i;
++
++  if (envopt == NULL || *envopt == 0)
++    return;
++
++  envargv = buildargv (envopt);
++  if (envargv == NULL)
++    return;
++
++  envargc = countargv (envargv);
++
++  newargc = argc + envargc;
++  newargv = xmalloc (sizeof (char *) * (newargc + 1));
++
++  newargv[0] = argv[0];
++
++  /* Copy args from env first */
++  for (i = 0; i < envargc; i++)
++    newargv[1 + i] = envargv[i];
++
++  /* Copy args from argv now */
++  for (i = 1; i < argc; i++)
++    newargv[envargc + i] = argv[i];
++
++  /* FIXME: envargv leaks */
++
++  *argcp = newargc;
++  *argvp = newargv;
++}
++
+ /* process.h */
+ 
+ /* for spawnvp (P_WAIT) */
+diff --git a/src/emx/src/libcrossemx/crossemx.h b/src/emx/src/libcrossemx/crossemx.h
+index 62c3987..0581523 100644
+--- a/src/emx/src/libcrossemx/crossemx.h
++++ b/src/emx/src/libcrossemx/crossemx.h
+@@ -44,6 +44,7 @@ void _splitpath (const char *src, char *drive, char *dir, char *fname,
+ int _execname (char *buf, size_t bufsize);
+ char *_realrealpath(const char *path, char *resolved, size_t size);
+ int _fullpath (char *dst, const char *src, int size);
++void _envargs (int *argcp, char ***argvp, const char *name);
+ 
+ /* fcntl.h */
+ #define O_BINARY 0
+-- 
+2.43.0
+

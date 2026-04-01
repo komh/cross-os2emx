@@ -1,7 +1,7 @@
-From d9582f1b888009c146bdc0e6b5ddb5036a983d89 Mon Sep 17 00:00:00 2001
+From 9deec37525c73b9afd43022563e430868d42ebf9 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 22:17:31 +0900
-Subject: [PATCH 2/3] Port to 64-bit platforms
+Subject: [PATCH 2/5] Port to 64-bit platforms
 
 ---
  src/emx/include/a_out.h         |  51 ++++---
@@ -1817,5 +1817,5 @@ index 55844c4..22183f2 100644
    int dict_blocks;
    int flags;
 -- 
-2.28.0
+2.43.0
 
