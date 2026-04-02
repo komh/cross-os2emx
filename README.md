@@ -15,6 +15,12 @@ Tested hosts:
 
 # History
 
+* cross-os2emx v1.1.1 (2026/04/02)
+    * Added `_envargs()` support
+        * Now `EMXOMFOPT` for emxomf, `EMXOMFSTRIPOPT` for emxomfstrip, `GASOPT` for as, and `GCCOPT` for gcc are supported.
+    * Updated `kdllar` to support response files
+    * Fixed misc.
+
 * cross-os2emx v1.1.0 (2026/03/29)
     * Updated `binutils` to v2.44
     * Updated `gcc` to v15.2.0
