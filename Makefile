@@ -278,7 +278,7 @@ dist:
 	prefixfirst=/$$(echo $$prefix | cut -d '/' -f 2); \
 	$(MAKE) install DESTDIR=$$destdir PREFIXROOT=$(PREFIXROOT) && \
 	{ \
-	  test-z "$$prefixroot" || \
+	  test -z "$$prefixroot" || \
 	    $(MV) $$destdir$$prefixroot$$prefixfirst $$destdir$$prefixfirst; \
 	} && \
 	$(SED) -e "s/@VER@/$(VERSION)/g" $(PACKAGE).txt \
