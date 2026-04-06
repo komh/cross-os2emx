@@ -231,7 +231,11 @@ install-extras:
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	for f in $(EXTRASDIR)/* ; do \
 	  n=$$(basename $$f); \
-	  $(INSTALL) $$f $(DESTDIR)$(TARGETBINDIR)/$$n; \
+	  if test -L $$f ; then \
+	    $(CP) -a $$f $(DESTDIR)$(TARGETBINDIR)/$$n; \
+	  else \
+	    $(INSTALL) $$f $(DESTDIR)$(TARGETBINDIR)/$$n; \
+	  fi; \
 	  if test "$$n" != "ldstub.bin" ; then \
 	    $(LN_S) -f ../$(TARGETSPEC)/bin/$$n $(DESTDIR)$(BINDIR); \
 	    $(LN_S) -f ../$(TARGETSPEC)/bin/$$n \
