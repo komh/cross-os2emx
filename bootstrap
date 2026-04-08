@@ -4,9 +4,21 @@ echo "Preparing autotools for bootstrapping..."
 make all-autotools || exit 1
 echo
 
+# Get the list of submodules to process.
+# If arguments are provided, use them as the list.
+# Otherwise, process all submodules.
+if [ $# -gt 0 ]; then
+    SUBMODULES=("$@")
+    echo "Specified submodules: ${SUBMODULES[*]}"
+else
+    SUBMODULES=(binutils-os2 gcc-os2 libc cmake-os2)
+    echo "All submodules: ${SUBMODULES[*]}"
+fi
+
+
 export PATH=$(pwd)/autotools/bin:$PATH
 
-for sub in binutils-os2 gcc-os2 libc cmake-os2 ; do
+for sub in "${SUBMODULES[@]}" ; do
   if test -L "$sub" ; then
     sub=$(readlink $sub)
   fi

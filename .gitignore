@@ -3,3 +3,4 @@ libc-i686-pc-os2-emx
 autotools
 meson/*.txt
 cmake/*.cmake
+.DS_store
