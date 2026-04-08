@@ -3,11 +3,13 @@ name: linux-x64
 on:
   push:
     paths:
+      - '**'
       - '!**.md'
       - '!cross-os2emx.txt'
 
   pull_request:
     paths:
+      - '**'
       - '!**.md'
       - '!cross-os2emx.txt'
 
