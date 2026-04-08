@@ -1,0 +1,138 @@
+From 6a50d901e3ff3e3402393e35e206a8c9be324e5a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jochen=20Sch=C3=A4fer?= <josch1710@live.de>
+Date: Wed, 8 Apr 2026 08:03:54 +0200
+Subject: [PATCH] Macos:- Macos needs some essentials defines in sys/types.h-
+ ar doesn't need -o, breaks on Macos- Arm target doesn't compile int , so we
+ use builtin trap
+
+---
+ src/emx/common.cross           |  2 +-
+ src/emx/src/emxbind/emxbind.c  |  2 +-
+ src/emx/src/emxbind/resource.c |  2 +-
+ src/emx/src/emxbind/utils.c    |  2 +-
+ src/emx/src/emxomf/emxomfar.c  |  2 +-
+ src/emx/src/emxomf/emxomfld.c  |  2 +-
+ src/emx/src/emxomf/weakld.c    | 14 ++++++++++++--
+ 7 files changed, 18 insertions(+), 8 deletions(-)
+
+diff --git a/src/emx/common.cross b/src/emx/common.cross
+index 62d81fb..e0785f9 100644
+--- a/src/emx/common.cross
++++ b/src/emx/common.cross
+@@ -114,7 +114,7 @@ $$($(1)_OBJS) $$($(1)_DEPS): CFLAGS += $($(1)_CFLAGS)
+ $(1)_TARGET := $(OUTDIR)/$(1)$(LIBEXT)
+ 
+ $$($(1)_TARGET): $$($(1)_OBJS)
+-	$(AR) $(ARFLAGS) $$($(1)_ARFLAGS) -o $$@ $$($(1)_OBJS)
++	$(AR) $(ARFLAGS) $$($(1)_ARFLAGS) $$@ $$($(1)_OBJS)
+ 
+ all: $$($(1)_TARGET)
+ 
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index 8f67631..18152b3 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -30,7 +30,7 @@ Boston, MA 02111-1307, USA.  */
+ #include "defs.h"
+ #include "emxbind.h"
+ 
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ #include "crossemx.h"
+ #endif
+ 
+diff --git a/src/emx/src/emxbind/resource.c b/src/emx/src/emxbind/resource.c
+index 7216ac2..f93730d 100644
+--- a/src/emx/src/emxbind/resource.c
++++ b/src/emx/src/emxbind/resource.c
+@@ -19,7 +19,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ #define _SYS__TYPES_H_
+ #endif
+ 
+diff --git a/src/emx/src/emxbind/utils.c b/src/emx/src/emxbind/utils.c
+index 61b81ea..cb01bcc 100644
+--- a/src/emx/src/emxbind/utils.c
++++ b/src/emx/src/emxbind/utils.c
+@@ -19,7 +19,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ #define _SYS__TYPES_H_
+ #endif
+ 
+diff --git a/src/emx/src/emxomf/emxomfar.c b/src/emx/src/emxomf/emxomfar.c
+index ecee713..3c5fa91 100644
+--- a/src/emx/src/emxomf/emxomfar.c
++++ b/src/emx/src/emxomf/emxomfar.c
+@@ -18,7 +18,7 @@ along with emxomfar; see the file COPYING.  If not, write to
+ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ /* disable to include sys/types.h of EMX */
+ #define _SYS__TYPES_H_
+ #endif
+diff --git a/src/emx/src/emxomf/emxomfld.c b/src/emx/src/emxomf/emxomfld.c
+index f1db8d7..60038e8 100644
+--- a/src/emx/src/emxomf/emxomfld.c
++++ b/src/emx/src/emxomf/emxomfld.c
+@@ -21,7 +21,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.  */
+ 
+ 
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ /* disable to include sys/types.h of EMX */
+ #define _SYS__TYPES_H_
+ #endif
+diff --git a/src/emx/src/emxomf/weakld.c b/src/emx/src/emxomf/weakld.c
+index 10d14b2..15efa7b 100644
+--- a/src/emx/src/emxomf/weakld.c
++++ b/src/emx/src/emxomf/weakld.c
+@@ -91,7 +91,7 @@
+ /*******************************************************************************
+ *   Header Files                                                               *
+ *******************************************************************************/
+-#ifndef __EMX__
++#if !defined __EMX__ && !defined __APPLE__
+ /* disable to include sys/types.h of EMX */
+ #define _SYS__TYPES_H_
+ #endif
+@@ -1537,7 +1537,13 @@ static const char *symGetDescr(PWLDSYM pSym)
+         case WLDSF_UNDEF:   psz += sprintf(psz, "UNDEF"); break;
+         case WLDSF_WKEXT:   psz += sprintf(psz, "WKEXT"); break;
+         case WLDSF_EXP_NM:  psz += sprintf(psz, "EXPORT"); break;
+-        default:            psz += sprintf(psz, "!!!internal error!!! "); __asm__("int $3"); break;
++        default:            psz += sprintf(psz, "!!!internal error!!! ");
++#if !defined __APPLE__
++            __asm__("int $3");
++#else
++            __builtin_trap();
++#endif
++            break;
+     }
+     if (pSym->fFlags & WLDSF_WEAK)
+         psz += sprintf(psz, " WEAK");
+@@ -2589,7 +2595,11 @@ static unsigned     pass1ReadOMFMod(PWLD pWld, PWLDMOD pMod, int fLibSearch)
+                 goto failure;
+             default:
+                 fprintf(stderr, "we shall not be here!!\n");
++#if !defined __APPLE__
+                 __asm__("int $3");
++#else
++                __builtin_trap();
++#endif
+                 break;
+         }
+ 
+-- 
+2.50.1 (Apple Git-155)
+
