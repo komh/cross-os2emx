@@ -1,0 +1,52 @@
+From 6aa3ea15f590545f330cfa3ed5512d379a948147 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jochen=20Sch=C3=A4fer?= <josch1710@live.de>
+Date: Wed, 8 Apr 2026 07:45:47 +0200
+Subject: [PATCH] Changes on binutils-os2:- Remove TARGET_OS_MAC from
+ compilation- i386aoutemx.c: Some casting is needed with Macos compilers
+ (clang and gcc)
+
+---
+ bfd/i386aoutemx.c | 4 ++--
+ conf-cross-os2emx | 6 ++++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/i386aoutemx.c b/bfd/i386aoutemx.c
+index 0a75a9ba..4b67b9ef 100644
+--- a/bfd/i386aoutemx.c
++++ b/bfd/i386aoutemx.c
+@@ -79,7 +79,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
+ 
+ 
+ #include <symcat.h>
+-#define MY_object_p                 MY(object_p)
++#define MY_object_p                 (void (* (*)(bfd *))(bfd *))MY(object_p)
+ #define MY_backend_data            &MY(backend_data)
+ #define MY_bfd_reloc_type_lookup    i386_aout_emx_reloc_type_lookup
+ 
+@@ -276,7 +276,7 @@ MY(object_p) (abfd)
+   exec.a_info = SWAP_MAGIC (exec_bytes.e_info);
+ #endif /* SWAP_MAGIC */
+ 
+-  target = NAME(aout,some_aout_object_p) (abfd, &exec, MY(callback));
++  target = (bfd_target*) NAME(aout,some_aout_object_p) (abfd, &exec, MY(callback));
+ 
+ #ifdef ENTRY_CAN_BE_ZERO
+   /* The NEWSOS3 entry-point is/was 0, which (amongst other lossage)
+diff --git a/conf-cross-os2emx b/conf-cross-os2emx
+index dcdfc651..964139da 100755
+--- a/conf-cross-os2emx
++++ b/conf-cross-os2emx
+@@ -18,4 +18,10 @@ opts="
+     --disable-plugins
+ "
+ 
++uname_s="$(uname -s)"
++if [ "$uname_s" = "Darwin" ]; then
++  CFLAGS="$CFLAGS -UTARGET_OS_MAC"
++  CXXFLAGS="$CXXFLAGS -UTARGET_OS_MAC"
++fi
++
+ $(dirname "$0")/configure $opts "$@"
+-- 
+2.50.1 (Apple Git-155)
+
