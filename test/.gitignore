@@ -1,0 +1,14 @@
+*.o
+*.obj
+*.a
+*.lib
+*.res
+*.map
+*.dll
+*.exe
+!autotools
+dll/*.def
+pm/*.def
+autotools/*.git
+cmake/*.git
+meson/*.git

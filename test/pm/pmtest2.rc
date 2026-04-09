@@ -1,0 +1,27 @@
+#include "pmtest2.h"
+
+MENU ID_PMTEST2
+BEGIN
+    SUBMENU "~File", ID_M_FILE
+    BEGIN
+        MENUITEM "~New...", ID_MI_NEW
+        MENUITEM "~Open...", ID_MI_OPEN
+        MENUITEM SEPARATOR
+        MENUITEM "~Save...", ID_MI_SAVE
+        MENUITEM "Save ~as...", ID_MI_SAVEAS
+        MENUITEM SEPARATOR
+        MENUITEM "~Exit...", ID_MI_EXIT
+    END
+
+    SUBMENU "~Edit", ID_M_EDIT
+    BEGIN
+        MENUITEM "~Undo\aAlt+Backspace", ID_MI_UNDO
+        MENUITEM "~Redo\aShift+Alt+Backspace", ID_MI_REDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cu~t\aShift+Del", ID_MI_CUT
+        MENUITEM "~Copy\aCtrl+Ins", ID_MI_COPY
+        MENUITEM "~Paste\aShift+Ins", ID_MI_PASTE
+        MENUITEM "Cl~ear\aDel", ID_MI_CLEAR
+    END
+
+END

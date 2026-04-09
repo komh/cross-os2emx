@@ -270,6 +270,10 @@ install: install-libtool
 install-libtool: all-libtool
 	$(MAKE) -C $(LIBTOOLDIR)/$(BUILDDIR).all-libtool install DESTDIR=$(DESTDIR)
 
+.PHONY: test
+test: install
+	$(MAKE) -C test
+
 .PHONY: dist
 dist:
 	destdir=$(CURDIR)/$(PACKAGE)-$(VERSION); \
@@ -338,3 +342,8 @@ clean: clean-libtool
 clean-libtool:
 	$(RM) -r $(LIBTOOLDIR)/build.all-libtool
 	$(RM) $(AUTOTOOLSDIR)/all-libtool.done
+
+.PHONY: clean-test
+clean: clean-test
+clean-test:
+	$(MAKE) -C test clean
