@@ -18,7 +18,7 @@ index a0f85e140a..bfc95f7487 100755
  "
  
 +uname_s="$(uname -s)"
-+if [ "x$uname_s" == "xDarwin" ]; then
++if [ "x$uname_s" = "xDarwin" ]; then
 +  CFLAGS="$CFLAGS -UTARGET_OS_MAC"
 +  CXXFLAGS="$CXXFLAGS -UTARGET_OS_MAC"
 +fi
@@ -34,8 +34,8 @@ index ffa76a323c..7d2a0273eb 100644
    && glibc_version_minor_define=`$EGREP '^[ 	]*#[ 	]*define[ 	]+__GLIBC_MINOR__[ 	]+[0-9]' $target_header_dir/features.h`; then
 -  glibc_version_major=`echo "$glibc_version_major_define" | sed -e 's/.*__GLIBC__[ 	]*//'`
 -  glibc_version_minor=`echo "$glibc_version_minor_define" | sed -e 's/.*__GLIBC_MINOR__[ 	]*//'`
-+  glibc_version_major=`echo "$glibc_version_major_define" | sed -e 's/.*__GLIBC__[ 	]*//;s/[ 	]*[^0-9].*//'`
-+  glibc_version_minor=`echo "$glibc_version_minor_define" | sed -e 's/.*__GLIBC_MINOR__[ 	]*//;s/[ 	]*[^0-9].*//'`
++  glibc_version_major=`echo "$glibc_version_major_define" | sed -e 's/.*__GLIBC__[ 	]*//'  -e 's/[ 	]*[^0-9].*//'`
++  glibc_version_minor=`echo "$glibc_version_minor_define" | sed -e 's/.*__GLIBC_MINOR__[ 	]*//'  -e 's/[ 	]*[^0-9].*//'`
  fi]])
  AC_MSG_RESULT([$glibc_version_major.$glibc_version_minor])
  AC_DEFINE_UNQUOTED([TARGET_GLIBC_MAJOR], [$glibc_version_major],
