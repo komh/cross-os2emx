@@ -7,11 +7,11 @@
 # If arguments are provided, use them as the list. 
 # Otherwise, process all submodules.
 if [ $# -gt 0 ]; then
-    SUBMODULES="$*"
-    echo "Specified submodules: $SUBMODULES"
+  SUBMODULES="$*"
+  echo "Specified submodules: $SUBMODULES"
 else
-    SUBMODULES="binutils-os2 gcc-os2 libc cmake-os2"
-    echo "All submodules: $SUBMODULES"
+  SUBMODULES="binutils-os2 gcc-os2 libc cmake-os2"
+  echo "All submodules: $SUBMODULES"
 fi
 
 # Confirm with the user
@@ -20,18 +20,18 @@ printf '%s' "Are you sure you want to proceed? (y/N) "
 read confirm
 
 case "$confirm" in
-    [Yy])
-        for sub in $SUBMODULES; do
-            if test -L "$sub"; then
-                sub=$(readlink "$sub")
-            fi
-            echo "Deinitializing $sub..."
-            git submodule deinit -f "$sub"
-        done
-        echo "Done."
-        ;;
-    *)
-        echo "Aborted."
-        exit 1
-        ;;
+  [Yy])
+    for sub in $SUBMODULES; do
+      if test -L "$sub"; then
+        sub=$(readlink "$sub")
+      fi
+      echo "Deinitializing $sub..."
+      git submodule deinit -f "$sub"
+    done
+    echo "Done."
+    ;;
+  *)
+  echo "Aborted."
+  exit 1
+  ;;
 esac
