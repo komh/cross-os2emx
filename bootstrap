@@ -8,36 +8,36 @@ echo
 # If arguments are provided, use them as the list.
 # Otherwise, process all submodules.
 if [ $# -gt 0 ]; then
-    SUBMODULES=("$@")
-    echo "Specified submodules: ${SUBMODULES[*]}"
+    SUBMODULES="$*"
+    echo "Specified submodules: $SUBMODULES"
 else
-    SUBMODULES=(binutils-os2 gcc-os2 libc cmake-os2)
-    echo "All submodules: ${SUBMODULES[*]}"
+    SUBMODULES="binutils-os2 gcc-os2 libc cmake-os2"
+    echo "All submodules: $SUBMODULES"
 fi
 
 
-export PATH=$(pwd)/autotools/bin:$PATH
+export PATH="$(pwd)/autotools/bin:$PATH"
 
-for sub in "${SUBMODULES[@]}" ; do
-  if test -L "$sub" ; then
-    sub=$(readlink $sub)
-  fi
-  echo "Initializing submodule $sub..."
-  git submodule update --init --recursive --force $sub || exit 1
+for sub in $SUBMODULES; do
+    if test -L "$sub"; then
+        sub=$(readlink "$sub")
+    fi
+    echo "Initializing submodule $sub..."
+    git submodule update --init --recursive --force "$sub" || exit 1
 
-  echo "Applying patches for $sub..."
-  gitam_opt="-3"
-  if test "$sub" = "gcc-os2-ps" -o "$sub" = "libc" ; then
-    gitam_opt="$gitam_opt --keep-cr"
-  fi
-  ( cd $sub && git am $gitam_opt ../patches/$sub/*.patch ) || exit 1
+    echo "Applying patches for $sub..."
+    gitam_opt="-3"
+    if test "$sub" = "gcc-os2-ps" || test "$sub" = "libc"; then
+        gitam_opt="$gitam_opt --keep-cr"
+    fi
+    ( cd "$sub" && git am $gitam_opt ../patches/"$sub"/*.patch ) || exit 1
 
-  if test -f $sub/autogen.sh ; then
-    echo "Bootstrapping $sub..."
-    ( cd $sub; chmod a+x autogen.sh; ./autogen.sh ) || exit 1
-  fi
+    if test -f "$sub/autogen.sh"; then
+        echo "Bootstrapping $sub..."
+        ( cd "$sub" && chmod a+x autogen.sh && ./autogen.sh ) || exit 1
+    fi
 
-  echo
+    echo
 done
 
 echo "Done."
