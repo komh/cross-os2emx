@@ -2,16 +2,22 @@ name: linux-x64
 
 on:
   push:
-    paths:
-      - '**'
-      - '!**.md'
-      - '!cross-os2emx.txt'
+    paths-ignore:
+      - '**.md'
+      - 'cross-os2emx.txt'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '.github/FUNDING.yml'
+      - '.github/dependabot.yml'
 
   pull_request:
-    paths:
-      - '**'
-      - '!**.md'
-      - '!cross-os2emx.txt'
+    paths-ignore:
+      - '**.md'
+      - 'cross-os2emx.txt'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '.github/FUNDING.yml'
+      - '.github/dependabot.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
