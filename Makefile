@@ -272,7 +272,7 @@ install-libtool: all-libtool
 
 .PHONY: test
 test: install
-	$(MAKE) -C test
+	$(MAKE) -C tests
 
 .PHONY: dist
 dist:
@@ -346,4 +346,4 @@ clean-libtool:
 .PHONY: clean-test
 clean: clean-test
 clean-test:
-	$(MAKE) -C test clean
+	$(MAKE) -C tests clean
