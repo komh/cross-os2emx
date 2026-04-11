@@ -30,19 +30,19 @@ jobs:
       - name: Install dependencies
         uses: gerlero/brew-install@v1
         with:
-          packages: coreutils wget texinfo
+          packages: coreutils texinfo
           cache: false
 
-#      - name: Set up git account
-#        run: |
-#          git config --global user.name "github-actions[bot]"
-#          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Set up git account
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bootstrap
+        run: arch --arm64 sh ./bootstrap
 
       - name: Set MAKEFLAGS
         run: echo "MAKEFLAGS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
-
-      - name: Bootstrap
-        run: ./bootstrap
 
       - name: Build
         run: arch --arm64 make
