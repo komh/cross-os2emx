@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         uses: gerlero/brew-install@v1
         with:
-          packages: coreutils texinfo
+          packages: coreutils texinfo autoconf
           cache: false
 
       - name: Set up git account
