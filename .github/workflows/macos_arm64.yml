@@ -1,0 +1,63 @@
+name: macos-arm64
+
+on:
+  push:
+    paths:
+      - '**'
+      - '!**.md'
+      - '!cross-os2emx.txt'
+
+  pull_request:
+    paths:
+      - '**'
+      - '!**.md'
+      - '!cross-os2emx.txt'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        uses: gerlero/brew-install@v1
+        with:
+          packages: coreutils wget texinfo
+          cache: false
+
+#      - name: Set up git account
+#        run: |
+#          git config --global user.name "github-actions[bot]"
+#          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set MAKEFLAGS
+        run: echo "MAKEFLAGS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
+
+      - name: Bootstrap
+        run: ./bootstrap
+
+      - name: Build
+        run: arch --arm64 make
+
+      - name: Install
+        run: arch --arm64 make install
+
+#      - name: Test
+#        run: arch --arm64 make test
+
+      - name: Dist
+        run: arch --arm64 make dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: Build packages
+          path: cross-is2emx-*.tar.gz
