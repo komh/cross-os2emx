@@ -1,7 +1,7 @@
-From 8d0e32048351dbe7708b41fc72dffa5ac40d72a1 Mon Sep 17 00:00:00 2001
+From f80113137664fca306aac08b7432e6c48ad205eb Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 15:16:00 +0900
-Subject: [PATCH 1/4] Add build scripts for i686-pc-os2-emx target
+Subject: [PATCH 1/5] Add build scripts for i686-pc-os2-emx target
 
 ---
  conf-cross-os2emx | 21 +++++++++++++++++++++

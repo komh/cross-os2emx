@@ -1,10 +1,11 @@
-From 6aa3ea15f590545f330cfa3ed5512d379a948147 Mon Sep 17 00:00:00 2001
+From 973c8c14c78c68b7c454697c19a3f0e79930df7f Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Jochen=20Sch=C3=A4fer?= <josch1710@live.de>
 Date: Wed, 8 Apr 2026 07:45:47 +0200
-Subject: [PATCH] Changes on binutils-os2:- Remove TARGET_OS_MAC from
- compilation- i386aoutemx.c: Some casting is needed with Macos compilers
- (clang and gcc)
+Subject: [PATCH 5/5] Port to Macos
 
+1. conf-cross-os2emx: Remove TARGET_OS_MAC from compilation
+
+2. i386aoutemx.c: Some casting is needed with Macos compilers (clang and gcc)
 ---
  bfd/i386aoutemx.c | 4 ++--
  conf-cross-os2emx | 6 ++++++
@@ -48,5 +49,5 @@ index dcdfc651..964139da 100755
 +
  $(dirname "$0")/configure $opts "$@"
 -- 
-2.50.1 (Apple Git-155)
+2.43.0
 

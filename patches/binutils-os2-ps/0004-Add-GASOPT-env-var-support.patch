@@ -1,7 +1,7 @@
-From c9c8a1e3080ccac358bd4bf2121b6a3c70b310c7 Mon Sep 17 00:00:00 2001
+From 0213ea9c4ada37c43ce2200d7336577cc91b73b1 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Wed, 1 Apr 2026 23:53:47 +0900
-Subject: [PATCH 4/4] Add GASOPT env var support
+Subject: [PATCH 4/5] Add GASOPT env var support
 
 ---
  gas/as.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
