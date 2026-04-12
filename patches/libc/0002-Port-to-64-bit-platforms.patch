@@ -1,7 +1,7 @@
-From 9deec37525c73b9afd43022563e430868d42ebf9 Mon Sep 17 00:00:00 2001
+From 47511089004908e4f401ee04233e7eb406886dbc Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 22:17:31 +0900
-Subject: [PATCH 2/5] Port to 64-bit platforms
+Subject: [PATCH 2/6] Port to 64-bit platforms
 
 ---
  src/emx/include/a_out.h         |  51 ++++---
