@@ -59,6 +59,8 @@ test-autotools:
 	$(MAKE) -C autotools PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
 
 test-meson:
+	test -f $(TARGETINCDIR)/pthread.h \
+	  || ./installlib.sh
 	$(MAKE) -C meson PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
 
 test-cmake:
