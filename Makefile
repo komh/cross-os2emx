@@ -227,6 +227,10 @@ install-emxtools: all-emxtools
 .PHONY: install-extras
 install: install-extras
 install-extras:
+	if test "$(shell uname -s)" = "Darwin" ; then \
+		$(TARX) extras_macos.tar.gz; \
+		$(CP) /usr/bin/nm $(EXTRASDIR); \
+	fi
 	$(INSTALL) -d $(DESTDIR)$(TARGETBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	for f in $(EXTRASDIR)/* ; do \
