@@ -272,7 +272,7 @@ install-libtool: all-libtool
 
 .PHONY: test
 test: install
-	$(MAKE) -C tests
+	$(MAKE) -C tests PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGETSPEC)
 
 .PHONY: dist
 dist:

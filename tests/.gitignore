@@ -12,3 +12,8 @@ pm/*.def
 autotools/*.git
 cmake/*.git
 meson/*.git
+kdllar/kdllar
+kdllar/kld-aout-dll
+kdllar/kld-aout-exe
+kdllar/kld-omf-dll
+kdllar/kld-omf-exe

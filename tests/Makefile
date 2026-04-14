@@ -39,11 +39,12 @@ RM := rm -f
 	$(LD) $(LDFLAGS) -Zomf -Zmap -o $@ $<
 
 .PHONY: all test test-gcc test-g++ test-dll test-pm test-autotools test-meson \
-        test-cmake
+        test-cmake test-kdllar
 
 all: test
 
-test: test-gcc test-g++ test-dll test-pm test-autotools test-meson test-cmake
+test: test-gcc test-g++ test-dll test-pm test-autotools test-meson test-cmake \
+      test-kdllar
 
 test-gcc: hello-aout.exe hello-omf.exe
 
@@ -70,8 +71,14 @@ test-cmake:
 	fi
 	$(MAKE) -C cmake PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
 
+test-kdllar:
+	$(MAKE) -C kdllar PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
+
+.PHONY: clean clean-gcc clean-g++ clean-dll clean-pm clean-autotools \
+        clean-meson clean-cmake clean-kdllar
+
 clean: clean-gcc clean-g++ clean-dll clean-pm clean-autotools clean-meson \
-       clean-cmake
+       clean-cmake clean-kdllar
 
 clean-gcc:
 	$(RM) *.o *.obj *.exe *.map
@@ -93,3 +100,6 @@ clean-meson:
 
 clean-cmake:
 	-$(MAKE) -C cmake clean PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
+
+clean-kdllar:
+	$(MAKE) -C kdllar clean PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
