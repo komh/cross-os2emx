@@ -16,8 +16,8 @@ LDFLAGS :=
 AR := $(TARGET)-ar
 ARFLAGS := crv
 
-KDLLAR := kdllar -cc $(CC) -noecho
-KLD := kld -cc $(CC) -noecho
+KDLLAR := kdllar -cc $(CC) -nolxlite
+KLD := kld -cc $(CC) -nolxlite
 
 EMXIMP := emximp
 
