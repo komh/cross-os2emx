@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 .SUFFIXES: .c .cpp .h .o .obj .exe .map
 
 PREFIXROOT := $(HOME)
