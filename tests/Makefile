@@ -1,5 +1,3 @@
-.NOTPARALLEL:
-
 .SUFFIXES: .c .cpp .h .o .obj .exe .map
 
 PREFIXROOT := $(HOME)
@@ -61,16 +59,18 @@ test-pm:
 test-autotools:
 	$(MAKE) -C autotools PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
 
-test-meson:
-	test -f $(TARGETINCDIR)/pthread.h \
-	  || ./installlib.sh
-	$(MAKE) -C meson PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
+.PHONY: install-lib
 
-test-cmake:
+install-lib:
 	if test ! -f $(TARGETINCDIR)/pthread.h \
 	   || test ! -f $(TARGETINCDIR)/os2tk45/os2.h ; then \
 	  ./installlib.sh; \
 	fi
+
+test-meson: | install-lib
+	$(MAKE) -C meson PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
+
+test-cmake: | install-lib
 	$(MAKE) -C cmake PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
 
 test-kdllar:
