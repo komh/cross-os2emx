@@ -22,6 +22,8 @@ TARGETBINDIR := $(TARGETPREFIX)/bin
 TARGETINCDIR := $(TARGETPREFIX)/include
 TARGETLIBDIR := $(TARGETPREFIX)/lib
 
+SYSNAME := $(shell uname -s)
+
 AR := $(BINDIR)/$(TARGETSPEC)-ar
 ARFLAGS := cru
 
@@ -229,7 +231,8 @@ install: install-extras
 install-extras:
 	$(INSTALL) -d $(DESTDIR)$(TARGETBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
-	for f in $(EXTRASDIR)/* ; do \
+	for f in "$(EXTRASDIR)/"* "$(EXTRASDIR)/$(SYSNAME)/"* ; do \
+	  test -f $$f || continue; \
 	  n=$$(basename $$f); \
 	  if test -L $$f || test ! -x $$f ; then \
 	    $(CP) -a $$f $(DESTDIR)$(TARGETBINDIR)/$$n; \
