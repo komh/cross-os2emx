@@ -69,4 +69,3 @@ jobs:
           name: Build-${{ github.run_id }}
           path: cross-os2emx-*.tar.gz
           overwrite: true
-
