@@ -1,0 +1,30 @@
+From 82a2ff6e620f7520a1cf34e3a43146e39df63b6e Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Thu, 16 Apr 2026 00:49:24 +0900
+Subject: [PATCH 2/2] fix SIGSEGV on Linux when /dev/tty does not exist
+
+For example, GitHub Actions does not provide /dev/tty. In this case,
+assume 80x25 screen.
+---
+ src/common/Vpsyslnx_lxLite.pas | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/common/Vpsyslnx_lxLite.pas b/src/common/Vpsyslnx_lxLite.pas
+index 161c785..85565cc 100644
+--- a/src/common/Vpsyslnx_lxLite.pas
++++ b/src/common/Vpsyslnx_lxLite.pas
+@@ -3722,6 +3722,11 @@ begin
+   // Initialize terminal
+   TrmInit;
+ 
++  // Assume 80x25 by default for the environment which does not have /dev/tty.
++  // For example, GitHub Actions.
++  ScrWidth  := 80;
++  ScrHeight := 25;
++
+   // Get window size, calculate usable screen, get buffer
+   if LnxIoCtl(TrmHandle, TIOCGWINSZ, @Size) = 0 then
+     begin
+-- 
+2.50.1
+
