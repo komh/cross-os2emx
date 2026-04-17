@@ -1,0 +1,106 @@
+name: CI Build and Test
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'cross-os2emx.txt'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '.github/FUNDING.yml'
+      - '.github/dependabot.yml'
+
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'cross-os2emx.txt'
+      - '**/.gitignore'
+      - '**/.gitattributes'
+      - '.github/FUNDING.yml'
+      - '.github/dependabot.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - name: linux-x64
+            runner: ubuntu-latest
+            run_test: true
+
+          - name: macos-arm64
+            runner: macos-26
+            run_test: false
+
+          - name: macos-x64
+            runner: macos-26-intel
+            run_test: false
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies for Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext autopoint
+
+      - name: Install dependencies for macOS
+        if: runner.os == 'macOS'
+        uses: gerlero/brew-install@v1
+        with:
+          packages: coreutils texinfo autoconf
+          cache: false
+
+      - name: Set up git account
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set MAKEFLAGS
+        run: echo "MAKEFLAGS=-j$(($(nproc) + 1))" >> $GITHUB_ENV
+
+      - name: Set PATH for macOS-arm64
+        if: matrix.name == 'macos-arm64'
+        run: echo "PATH=$(echo /opt/homebrew/Cellar/coreutils/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+
+      - name: Set PATH for macOS-x64
+        if: matrix.name == 'macos-x64'
+        run: echo "PATH=$(echo /usr/local/Cellar/coreutils/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+
+      - name: Bootstrap
+        run: ./bootstrap
+
+      - name: Build
+        run: make
+
+      - name: Install
+        run: make install
+
+      - name: Test
+        if: ${{ matrix.run_test }}
+        run: make test
+
+      - name: Dist
+        run: make dist
+
+      - name: Prepare tarball for ${{ matrix.name }}
+        run: |
+          v="$(git describe --abbrev=0)"
+          mv cross-os2emx-$v.tar.gz cross-os2emx-${{ matrix.name }}-$v.tar.gz
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.name }}-${{ github.run_id }}
+          path: cross-os2emx-*.tar.gz
+          overwrite: true
