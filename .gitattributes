@@ -3,3 +3,4 @@
 
 /patches/libc/* -text
 /patches/gcc-os2-ps/* -text
+/patches/lxlite/* -text
