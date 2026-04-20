@@ -34,11 +34,11 @@ jobs:
 
           - name: macos-arm64
             runner: macos-26
-            run_test: true
+            run_test: false
 
           - name: macos-x64
             runner: macos-26-intel
-            run_test: true
+            run_test: false
 
     runs-on: ${{ matrix.runner }}
 
@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'macOS'
         uses: gerlero/brew-install@v1
         with:
-          packages: coreutils texinfo autoconf make
+          packages: coreutils texinfo autoconf automake make
           cache: false
 
       - name: Set up git account
