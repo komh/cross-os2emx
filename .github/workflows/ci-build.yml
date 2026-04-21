@@ -99,7 +99,7 @@ jobs:
           mv cross-os2emx-$v.tar.gz cross-os2emx-${{ matrix.name }}-$v.tar.gz
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}-${{ github.run_id }}
           path: cross-os2emx-*.tar.gz
