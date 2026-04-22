@@ -1,0 +1,4 @@
+#! /bin/sh
+
+# This is a stub for lxlite. It does nothing.
+return 0

@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'macOS'
         uses: gerlero/brew-install@v1
         with:
-          packages: coreutils texinfo autoconf
+          packages: coreutils texinfo autoconf automake make
           cache: false
 
       - name: Set up git account
@@ -71,11 +71,11 @@ jobs:
 
       - name: Set PATH for macOS-arm64
         if: matrix.name == 'macos-arm64'
-        run: echo "PATH=$(echo /opt/homebrew/Cellar/coreutils/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+        run: echo "PATH=$(echo /opt/homebrew/Cellar/coreutils/*/libexec/gnubin):$(echo /opt/homebrew/Cellar/make/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
 
       - name: Set PATH for macOS-x64
         if: matrix.name == 'macos-x64'
-        run: echo "PATH=$(echo /usr/local/Cellar/coreutils/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+        run: echo "PATH=$(echo /usr/local/Cellar/coreutils/*/libexec/gnubin):$(echo /usr/local/Cellar/make/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
 
       - name: Bootstrap
         run: ./bootstrap
