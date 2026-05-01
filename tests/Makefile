@@ -36,7 +36,7 @@ RM := rm -f
 	$(LD) $(LDFLAGS) -Zmap -o $@ $<
 
 %-omf.exe: %.obj
-	$(LD) $(LDFLAGS) -Zomf -Zmap -o $@ $<
+	$(LD) $(LDFLAGS) -Zomf -Zmap -Zsym -o $@ $<
 
 .PHONY: all test test-gcc test-g++ test-dll test-pm test-autotools test-meson \
         test-cmake test-kdllar
@@ -83,10 +83,10 @@ clean: clean-gcc clean-g++ clean-dll clean-pm clean-autotools clean-meson \
        clean-cmake clean-kdllar
 
 clean-gcc:
-	$(RM) *.o *.obj *.exe *.map
+	$(RM) *.o *.obj *.exe *.map *.sym
 
 clean-g++:
-	$(RM) *.o *.obj *.exe *.map
+	$(RM) *.o *.obj *.exe *.map *.sym
 
 clean-dll:
 	$(MAKE) -C dll clean PREFIXROOT=$(PREFIXROOT) PREFIX=$(PREFIX) TARGET=$(TARGET)
