@@ -19,6 +19,12 @@ ARFLAGS := crv
 KDLLAR := kdllar -cc $(CC)
 KLD := kld -cc $(CC)
 
+SYSNAME := $(shell uname -s)
+ifeq ($(SYSNAME),Darwin)
+KDLLAR += -nolxlite
+KLD += -nolxlite
+endif
+
 EMXIMP := emximp
 
 MV := mv
