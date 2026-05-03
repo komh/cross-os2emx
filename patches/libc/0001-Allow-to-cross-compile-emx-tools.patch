@@ -1,7 +1,7 @@
-From aa2c711888001e5402c5252d2adfc606b05b9682 Mon Sep 17 00:00:00 2001
+From 806fe9ab3aadf48d7a1b67faa2b501c7bb15e383 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 21:58:01 +0900
-Subject: [PATCH 1/6] Allow to cross-compile emx tools
+Subject: [PATCH 1/7] Allow to cross-compile emx tools
 
 ---
  src/emx/Makefile.cross                 |  51 +++

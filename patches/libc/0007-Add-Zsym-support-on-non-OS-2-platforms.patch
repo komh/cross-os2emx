@@ -1,0 +1,36 @@
+From 281e0c5f7dbd232129f508a31b011096a6664f81 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Tue, 28 Apr 2026 00:43:58 +0900
+Subject: [PATCH 7/7] Add -Zsym support on non-OS/2 platforms
+
+---
+ src/emx/src/emxomf/emxomfld.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/emx/src/emxomf/emxomfld.c b/src/emx/src/emxomf/emxomfld.c
+index 60038e8..e902e51 100644
+--- a/src/emx/src/emxomf/emxomfld.c
++++ b/src/emx/src/emxomf/emxomfld.c
+@@ -2537,6 +2537,7 @@ int main (int argc, char *argv[])
+ 
+       /* Invoke mapsym.cmd writing the .sym file to current directory. */
+       arg_init (TRUE);
++#ifdef __EMX__
+       if (getenv ("COMSPEC"))
+         put_arg (getenv ("COMSPEC"), TRUE, FALSE);
+       else
+@@ -2549,6 +2550,11 @@ int main (int argc, char *argv[])
+          put_arg ("link386", TRUE, FALSE);
+       else
+          put_arg ("vac3xx", TRUE, FALSE);
++#else
++      put_arg ("kmapsym", TRUE, FALSE);
++      /* On non-OS/2 platforms, only wlink is supproted. */
++      put_arg ("-w", TRUE, FALSE);
++#endif
+       put_arg (map_fname_fullpath, TRUE, FALSE);
+       arg_end ();
+       rc = emxomfld_spawn (command_line, "Mapsym");
+-- 
+2.43.0
+

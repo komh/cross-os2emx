@@ -40,13 +40,13 @@ dll-aout.def: dllmod.o
 	$(EMXEXP) $^ >> $@
 
 dllmain-omf.exe: dllmain.obj dllmod.lib
-	$(LD) $(LDFLAGS) -Zomf -Zmap -o $@ $^
+	$(LD) $(LDFLAGS) -Zomf -Zmap -Zsym -o $@ $^
 
 dllmod.lib: dll-omf.dll
 	$(EMXIMP) -o $@ $<
 
 dll-omf.dll: dllmod.obj dllmod2.obj dll-omf.def
-	$(LD) -Zomf -Zdll -Zmap -o $@ $^
+	$(LD) -Zomf -Zdll -Zmap -Zsym -o $@ $^
 
 dll-omf.def: dllmod.obj
 	echo "LIBRARY $(basename $@) INITINSTANCE TERMINSTANCE" > $@
@@ -54,4 +54,4 @@ dll-omf.def: dllmod.obj
 	$(EMXEXP) $^ >> $@
 
 clean:
-	$(RM) *.o *.obj *.a *.lib *.dll *.exe *.def *.map
+	$(RM) *.o *.obj *.a *.lib *.dll *.exe *.def *.map *.sym

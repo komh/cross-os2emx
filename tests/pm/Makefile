@@ -36,7 +36,7 @@ RM := rm -f
 
 %-omf.exe: %.obj %-omf.res
 	echo "NAME $(basename $@) WINDOWAPI" > $@.def
-	$(LD) $(LDFLAGS) -Zomf -Zmap -o $@ $^ $@.def
+	$(LD) $(LDFLAGS) -Zomf -Zmap -Zsym -o $@ $^ $@.def
 
 .PHONY: all test clean
 
@@ -45,4 +45,4 @@ all: test
 test: pmtest2-aout.exe pmtest2-omf.exe
 
 clean:
-	$(RM) *.o *.obj *.res *.def *.exe *.map
+	$(RM) *.o *.obj *.res *.def *.exe *.map *.sym

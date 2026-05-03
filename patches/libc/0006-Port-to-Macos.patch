@@ -1,7 +1,7 @@
-From 724293096d92f6e9dda8730507dcaefc6e349bae Mon Sep 17 00:00:00 2001
+From b33486bd7fb2d89e7df34bf3e07c60d63f2e3285 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Jochen=20Sch=C3=A4fer?= <josch1710@live.de>
 Date: Wed, 8 Apr 2026 08:03:54 +0200
-Subject: [PATCH 6/6] Port to Macos
+Subject: [PATCH 6/7] Port to Macos
 
 1. Macos needs some essentials defines in sys/types.h
 

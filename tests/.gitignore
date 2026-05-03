@@ -4,6 +4,7 @@
 *.lib
 *.res
 *.map
+*.sym
 *.dll
 *.exe
 !autotools
