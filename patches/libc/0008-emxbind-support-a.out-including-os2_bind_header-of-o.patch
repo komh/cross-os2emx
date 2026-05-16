@@ -1,0 +1,34 @@
+From 1d453f205c7e72533fe6f5caf9659a32ffc51742 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sat, 9 May 2026 17:55:48 +0900
+Subject: [PATCH 8/8] emxbind: support a.out including os2_bind_header of
+ old-EMX startup code
+
+---
+ src/emx/src/emxbind/fixup.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/emx/src/emxbind/fixup.c b/src/emx/src/emxbind/fixup.c
+index 2958508..ede95f4 100644
+--- a/src/emx/src/emxbind/fixup.c
++++ b/src/emx/src/emxbind/fixup.c
+@@ -576,7 +576,15 @@ void os2_fixup (void)
+   my_seek (&inp_file, data_base + data_off);
+   my_read (&set_len, sizeof (set_len), &inp_file);
+   if (set_len != DATASEG_MAGIC)
+-    error ("invalid data segment (does not start with 0x%x)", DATASEG_MAGIC);
++    {
++      my_seek (&inp_file, data_base + data_off + sizeof (dword) * 13);
++      my_read (&set_len, sizeof (set_len), &inp_file);
++      /* Check if os2_bind_header of old-EMX startup code */
++      if (set_len != 0x02000000         /* flags: a.out application */
++          && set_len != 0x02000001)     /* flags: a.out DLL */
++        error ("invalid data segment (does not start with 0x%x)", DATASEG_MAGIC);
++      my_seek (&inp_file, data_base + data_off + sizeof (dword) * 10);
++    }
+   /* Now read the offset to the __os2_dll set */
+   my_read (&set_len, sizeof (set_len), &inp_file);
+ 
+-- 
+2.43.0
+
