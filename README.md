@@ -47,7 +47,7 @@ Tested hosts:
     * Fixed ICE due to `__declspec(dllexport)`. Issue #9
     * Fixed misc.
 
-* os2emx-cross-toolchain-b1 (20206/02/23)
+* os2emx-cross-toolchain-b1 (2026/02/23)
     * Released at `github`
 
 * os2emx-cross-toolchain-test2 (2026/02/19)
