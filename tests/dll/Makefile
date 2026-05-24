@@ -17,7 +17,7 @@ RM := rm -f
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 %.obj: %.c
-	$(CC) $(CFLAGS) -DBUILD_OMF -Zomf -c -o $@ $<
+	$(CC) $(CFLAGS) -Zomf -c -o $@ $<
 
 .PHONY: all test clean
 
@@ -31,7 +31,7 @@ dllmain-aout.exe: dllmain.o dllmod.a
 dllmod.a: dll-aout.dll
 	$(EMXIMP) -o $@ $<
 
-dll-aout.dll: dllmod.o dll-aout.def
+dll-aout.dll: dllmod.o dllmod2.o dll-aout.def
 	$(LD) -Zdll -o $@ $^
 
 dll-aout.def: dllmod.o
