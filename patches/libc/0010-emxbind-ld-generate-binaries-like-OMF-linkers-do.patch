@@ -1,0 +1,84 @@
+From 43b7129b94d2061418d5652eea97a1265569cd8b Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh@chollian.net>
+Date: Sat, 27 Jun 2015 18:09:41 +0900
+Subject: [PATCH 10/11] emxbind, ld: generate binaries like OMF linkers do
+
+1. Append default extension if not specified
+
+.exe for the executable, .dll for DLLs.
+
+2. Generate DLL if -Zdll is given, even if extension is not .dll
+
+3. The behavior of -Zexe does not change for the backward compatibility
+
+After all, emxbind and ld generate binaries like:
+
+    -Zexe -o test[.xxx] : test[.xxx](stub) and test[.xxx].exe
+    -Zexe -o test.exe   : test.exe
+    -o test[.exe]       : test.exe
+    -o test.dll         : test.dll(dll)
+    -o test.xxx         : test.xxx(neither executable nor dll)
+    -Zdll -o test[.dll] : test.dll
+    -Zdll -o test.xxx   : test.xxx(dll)
+---
+ src/emx/src/emxbind/emxbind.c |  3 ++-
+ src/emx/src/ld/ld.c           | 12 +++++++++++-
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index 8f67631..f2bf0ad 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -476,7 +476,8 @@ static void get_args (void)
+ 	  _defext (def_fname, "def");
+           read_def_file ();
+ 	}
+-      file_name (out_fname, (dll_flag ? "dll" : "exe"),
++      file_name (out_fname, (opt_o != NULL && _getext(opt_o)) ? NULL :
++                            (dll_flag ? "dll" : "exe"),
+                  (opt_o != NULL ? opt_o : inp_fname));
+       if (stricmp (inp_fname, out_fname) == 0)
+         error ("The input and output files have the same name");
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index 30781d9..964db25 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -1101,6 +1101,7 @@ static struct option longopts[] =
+   {"Zwin32", 0, 0, 140},        /* Create GUI, CUI Win32 */
+   {"Zrsx32", 0, 0, 141},        /* Create Win32/DOS win32 base */
+   {"Zemx32", 0, 0, 142},        /* Create Win32/DOS emx base */
++  {"Zdll", 0, 0, 143},          /* Create .dll file */
+   {"S", 0, 0, 'S'},
+   {"T", 1, 0, 'T'},
+   {"Ttext", 1, 0, 'T'},
+@@ -1301,6 +1302,10 @@ decode_command (argc, argv)
+           rsxnt_linked = RSXNT_EMX;
+           break;
+ 
++        case 143:               /* -Zdll */
++          dll_flag = 1;
++          break;
++
+         case 'R':
+ 	  reloc_flag = 1;
+ 	  break;
+@@ -3899,10 +3904,15 @@ void check_exe (void)
+   else
+     {
+       ext = _getext2 (output_filename);
+-      if (stricmp (ext, ".dll") == 0)
++      if (dll_flag || stricmp (ext, ".dll") == 0)
+         {
++          if (!*ext)
++            output_filename = concat (output_filename, ".dll", NULL);
++
+           reloc_flag = 1; dll_flag = 1;
+         }
++      else if (!*ext)
++          output_filename = concat (output_filename, ".exe", NULL);
+       else if (stricmp (ext, ".exe") != 0)
+         {
+           exe_filename = NULL;
+-- 
+2.43.0
+

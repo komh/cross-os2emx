@@ -1,0 +1,203 @@
+From 40333e35077207ea1601a59b447d4c8b04989ac1 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sun, 24 May 2026 19:19:07 +0900
+Subject: [PATCH 11/11] emxbind, ld: Export __declspec(dllexport) symbols
+
+---
+ src/emx/src/emxbind/emxbind.c |  2 +-
+ src/emx/src/emxbind/emxbind.h |  2 +-
+ src/emx/src/emxbind/export.c  | 84 +++++++++++++++++++++++++++++++++--
+ src/emx/src/ld/ld.c           | 11 +++++
+ 4 files changed, 94 insertions(+), 5 deletions(-)
+
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index f2bf0ad..a7f8862 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -150,7 +150,7 @@ static int md_callback (struct _md *md, const _md_stmt *stmt, _md_token token,
+         exp.internalname = xstrdup (stmt->export.entryname);
+       exp.offset = 0;
+       exp.object = 0;
+-      add_export (&exp);
++      add_export (&exp, TRUE);
+       break;
+ 
+     case _MD_HEAPSIZE:
+diff --git a/src/emx/src/emxbind/emxbind.h b/src/emx/src/emxbind/emxbind.h
+index 01b6449..f141836 100644
+--- a/src/emx/src/emxbind/emxbind.h
++++ b/src/emx/src/emxbind/emxbind.h
+@@ -491,7 +491,7 @@ void put_impmod (void);
+ 
+ /* export.c */
+ 
+-void add_export (const struct export *exp);
++void add_export (const struct export *exp, int from_def);
+ void entry_name (struct grow *table, const char *name, int ord);
+ void exports (void);
+ const struct export *get_export (int i);
+diff --git a/src/emx/src/emxbind/export.c b/src/emx/src/emxbind/export.c
+index 0eaf337..e3bf80d 100644
+--- a/src/emx/src/emxbind/export.c
++++ b/src/emx/src/emxbind/export.c
+@@ -39,14 +39,25 @@ static int export_len = 0;
+    Exporting a symbol with different external names triggers a warning
+    message. */
+ 
+-void add_export (const struct export *exp)
++void add_export (const struct export *exp, int from_def)
+ {
+   int i;
+ 
+   for (i = 0; i < export_len; ++i)
+     {
+       if (strcmp (exp->entryname, export_data[i].entryname) == 0)
+-        error ("export multiply defined: %s", exp->entryname);
++        {
++          if (from_def)
++            error ("export multiply defined: %s", exp->entryname);
++          else
++            {
++              /* Ignore export multiply defined by __declspec(dllexport). */
++              free (exp->entryname);
++              free (exp->internalname);
++              return;
++            }
++        }
++
+       if ((verbosity >= 2) &&
+           (strcmp (exp->internalname, export_data[i].internalname) == 0))
+         printf ("emxbind: %s multiply exported (warning)\n",
+@@ -145,11 +156,78 @@ void exports (void)
+   word object;
+   dword offset;
+ 
++  read_sym ();
++
++  /* Add __declspec(dllexport) symbols */
++
++  for (i = 0; i < sym_count; i++)
++    {
++      struct export e;
++      const char *name;
++      const char *symbol;
++      const char *ordinal;
++      char *ordinal_end;
++      const char *sym_type;
++      int name_len;
++      int symbol_len;
++
++      if( sym_image[ i ].n_type != N_EXP )
++        continue;
++
++      /* dllexport: <exportname>,<ordinal>=<asmname>,<code|data> */
++
++      name = (char *)str_image + sym_image[i].n_un.n_strx;
++
++      /* find equal sign first, we'll use this for validating the ordinal. */
++      symbol = strchr (name, '=');
++      if (!symbol)
++          error ("Invalid export record: missing `='. \nstabs: %s", name);
++
++      /* ordinal */
++      ordinal = strchr (name, ',');
++      if (!ordinal || ordinal >= symbol)
++        error ("Invalid export record: missing ordinal.\nstabs: %s", name);
++      name_len = ordinal - name;
++      ordinal++;
++      ord = strtol (ordinal, &ordinal_end, 0);
++      if (ord < 0 || ord >= 0x10000)
++        error ("Invalid export record: ordinal value is out of range (0-65k):%d\nstabs:%s",
++               ord, name);
++      if (ordinal_end != symbol)
++        error ("Invalid export record: ordinal field doesn't end at`='.\nstabs:%s",
++               name);
++
++      /* type and symbol */
++      symbol++;
++      sym_type = strchr (symbol, ',');
++      if (!sym_type)
++        error("Invalid export record: Symbol type is missing\nstabs:%s", name);
++      symbol_len = sym_type - symbol;
++      sym_type++;
++      if (strcmp (sym_type, "code") && strcmp (sym_type, "data") &&
++          strcmp (sym_type, "bss") && strcmp (sym_type, "common"))
++        error("Invalid export record: Invalid symbol type: %s\nstabs:%s",
++              sym_type, name);
++      if (!name_len)
++        error("Invalid export record: No (internal) symbol name.\nstabs:%s",
++              name);
++
++      e.ord = ord;
++      e.resident = !e.ord;
++      e.entryname = xstrdup (name);
++      e.entryname[name_len] = '\0';
++      e.flags = 0;
++      e.internalname = xstrdup (symbol);
++      e.internalname[symbol_len] = '\0';
++      e.offset = 0;
++      e.object = 0;
++      add_export (&e, FALSE);
++    }
++
+   if (export_len != 0)
+     {
+       if (a_in_h.a_syms == 0 || a_in_str_size == 0)
+         error ("need symbol table for EXPORTS");
+-      read_sym ();
+     }
+ 
+   /* Search symbol table */
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index 964db25..29ae982 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -484,6 +484,9 @@ int local_sym_count;
+    whose names don't start with L. */
+ int non_L_local_sym_count;
+ 
++/* Count the number of nlist entries for __declspec(dllexport). */
++int dllexport_sym_count;
++
+ /* Count the number of nlist entries for debugger info.  */
+ int debugger_sym_count;
+ 
+@@ -1010,6 +1013,7 @@ main (argc, argv)
+ 
+   local_sym_count = 0;
+   non_L_local_sym_count = 0;
++  dllexport_sym_count = 0;
+   debugger_sym_count = 0;
+   undefined_global_sym_count = 0;
+   set_symbol_count = 0;
+@@ -2090,6 +2094,8 @@ enter_file_symbols (entry)
+ 	    non_L_local_sym_count++;
+ 	  local_sym_count++;
+ 	}
++      else if (p->n_type == N_EXP)
++	dllexport_sym_count++;
+       else debugger_sym_count++;
+ #ifdef DEBUG_BIRD
+       fprintf(stderr, "dbg: %s sym #%3td: un=%08lx typ=%02x\n",
+@@ -3749,6 +3755,8 @@ compute_a_out_section_offsets (void)
+   if (strip_symbols == STRIP_NONE)
+     nsyms += debugger_sym_count;
+ 
++  nsyms += dllexport_sym_count;
++
+   outheader.a_syms = nsyms * sizeof (struct ninfo);
+ 
+   if (output_style == OUTPUT_RELOCATABLE || reloc_flag)
+@@ -5159,6 +5167,9 @@ write_file_syms (entry, syms_written_addr)
+ 		 && !(discard_locals == DISCARD_L &&
+ 		      (p->n_un.n_strx + entry->strings)[0] == LPREFIX)
+ 		 && type != N_WARNING);
++      else if (type == N_EXP)
++	/* __declspec(dllexport) symbol */
++	write = 1;
+       else if (!(type & N_EXT))
+ 	/* debugger symbol */
+         write = (strip_symbols == STRIP_NONE);
+-- 
+2.43.0
+
