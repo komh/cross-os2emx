@@ -96,7 +96,7 @@ jobs:
       - name: Prepare tarball for ${{ matrix.name }}
         run: |
           v="$(git describe --abbrev=0)"
-          mv cross-os2emx-$v.tar.gz cross-os2emx-${{ matrix.name }}-$v.tar.gz
+          mv cross-os2emx-$v.tar.gz cross-os2emx-$v-${{ matrix.name }}.tar.gz
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
