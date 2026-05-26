@@ -1,0 +1,12 @@
+name: CI Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  call-ci-main:
+    uses: ./.github/workflows/ci-main.yml
+    permissions:
+      contents: write
