@@ -12,8 +12,22 @@ This consists of `binutils`, `gcc`, `LIBCn`, `CMake`, `libtool`, and some build 
 
 Tested hosts:
 * x86\_64-unknown-linux-gnu
+* x86\_64-apple-darwin
+* aarch64-apple-darwin
 
 # History
+
+* cross-os2emx v1.2.0 (20206/05/26)
+    * Added macOS support by @josch1710
+    * Added `lxLite` v1.3.9 and `kmapsym` for Linux
+    * Added `__declspec(dllexport)` support to the aout linker, `ld` and `emxbind`
+    * Updated `kdllar` to v1.4.0
+    * Updated the executables in `extras` to statically linked versions
+    * Fixed `-Zomf -Zsyms` does not generate `.sym` file. Issue #8
+    * Fixed `Unix Makefiles` generator of `CMake` fails compile tests. Issue #12
+    * Fixed `kdllar` fails on macOS due to `__.SYMDEF`. Issue #28
+    * Fixed `emxbind` does not recognize a.out files with old-EMX startup code. Issue #30
+    * Fixed misc.
 
 * cross-os2emx v1.1.1 (2026/04/02)
     * Added `_envargs()` support
@@ -103,7 +117,6 @@ This will install into `$PREFIXROOT/opt/os2emx`.
 # Known problems
 
 * Some .so files are missing in pre-built binaries such as `libiconv.so.2` and `libmpfr.so.4` and so on. For this, see https://github.com/komh/cross-os2emx/issues/2.
-* `-Zomf -Zsym` does not generate `.sym` file at all. `mapsym.cmd` and `mapsym.exe` should be ported.
 
 # Donation
 
