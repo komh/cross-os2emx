@@ -10,6 +10,9 @@ on:
       - '.github/FUNDING.yml'
       - '.github/dependabot.yml'
 
+    tags:
+      - '*'
+
   pull_request:
     paths-ignore:
       - '**.md'
@@ -41,6 +44,9 @@ jobs:
             run_test: false
 
     runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -99,8 +105,18 @@ jobs:
           mv cross-os2emx-$v.tar.gz cross-os2emx-$v-${{ matrix.name }}.tar.gz
 
       - name: Upload artifacts
+        if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}-${{ github.run_id }}
           path: cross-os2emx-*.tar.gz
           overwrite: true
+
+      - name: Release
+        if: "startsWith(github.ref, 'refs/tags/')"
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cross-os2emx-*-${{ matrix.name }}.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
