@@ -2,6 +2,12 @@ name: CI Build and Test
 
 on:
   push:
+    branches:
+      - '**'
+      
+    tags-ignore:
+      - '**'
+      
     paths-ignore:
       - '**/*.md'
       - 'cross-os2emx.txt'
@@ -9,9 +15,6 @@ on:
       - '**/.gitattributes'
       - '.github/FUNDING.yml'
       - '.github/dependabot.yml'
-
-    tags-ignore:
-      - '**'
 
   pull_request:
     paths-ignore:
