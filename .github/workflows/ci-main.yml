@@ -98,6 +98,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: cross-os2emx-*-${{ matrix.name }}.tar.gz
-          generate_release_notes: true
+          generate_release_notes: ${{ matrix.name == 'linux-x64' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
