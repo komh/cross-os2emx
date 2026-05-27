@@ -17,7 +17,7 @@ Tested hosts:
 
 # History
 
-* cross-os2emx v1.2.0 (20206/05/26)
+* cross-os2emx v1.2.0 (2026/05/26)
     * Added macOS support by @josch1710
     * Added `lxLite` v1.3.9 and `kmapsym` for Linux
     * Added `__declspec(dllexport)` support to the aout linker, `ld` and `emxbind`
