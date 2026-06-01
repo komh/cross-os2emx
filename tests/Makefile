@@ -33,7 +33,7 @@ RM := rm -f
 	$(CXX) $(CXXFLAGS) -Zomf -c -o $@ $<
 
 %-aout.exe: %.o
-	$(LD) $(LDFLAGS) -Zmap -o $@ $<
+	$(LD) $(LDFLAGS) -Zmap -Zsym -o $@ $<
 
 %-omf.exe: %.obj
 	$(LD) $(LDFLAGS) -Zomf -Zmap -Zsym -o $@ $<
