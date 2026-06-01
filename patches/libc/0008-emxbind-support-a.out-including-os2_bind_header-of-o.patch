@@ -1,7 +1,7 @@
 From 1e29d9e1e6ee594209e177f2e158391b017f8bd1 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sat, 9 May 2026 17:55:48 +0900
-Subject: [PATCH 08/11] emxbind: support a.out including os2_bind_header of
+Subject: [PATCH 08/13] emxbind: support a.out including os2_bind_header of
  old-EMX startup code
 
 ---

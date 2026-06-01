@@ -1,0 +1,46 @@
+From 671c7d961a0cbf554f9919aa945148b5973df6e0 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Mon, 1 Jun 2026 23:21:12 +0900
+Subject: [PATCH 13/13] emxbind, ld: Add -Zsym support on non-OS/2 platforms
+
+---
+ src/emx/src/emxbind/map.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/emx/src/emxbind/map.c b/src/emx/src/emxbind/map.c
+index aa32b56..de00e55 100644
+--- a/src/emx/src/emxbind/map.c
++++ b/src/emx/src/emxbind/map.c
+@@ -23,7 +23,9 @@ Boston, MA 02111-1307, USA.  */
+ #include <stdlib.h>
+ #include <string.h>
+ #include <alloca.h>
++#ifdef __EMX__
+ #include <process.h>
++#endif
+ #include "defs.h"
+ #include "emxbind.h"
+ 
+@@ -280,6 +282,7 @@ static void map_entrypoint (void)
+ 
+ static void write_sym (const char *map_fname)
+ {
++#ifdef __EMX__
+   char *comspec;
+ 
+   comspec = getenv ("COMSPEC");
+@@ -290,6 +293,11 @@ static void write_sym (const char *map_fname)
+   if (spawnlp (P_WAIT, comspec, comspec, "/c", "mapsym.cmd", "link386",
+                map_fname, NULL) == -1)
+     error ("cannot spawn mapsym.cmd");
++#else
++  /* Invoke kmapsym. */
++  if (spawnlp (P_WAIT, "kmapsym", "kmapsym", map_fname, NULL) == -1)
++    error ("cannot spawn kmapsym");
++#endif
+ }
+ 
+ /* Write the .map file. */
+-- 
+2.43.0
+
