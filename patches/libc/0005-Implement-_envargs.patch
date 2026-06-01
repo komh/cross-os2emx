@@ -1,7 +1,7 @@
 From 27b1469cfee8ec9e71fd38a135aef8bc808e27c9 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Wed, 1 Apr 2026 23:19:39 +0900
-Subject: [PATCH 05/11] Implement _envargs()
+Subject: [PATCH 05/13] Implement _envargs()
 
 ---
  src/emx/src/emxbind/Makefile.cross     |  2 ++

@@ -1,7 +1,7 @@
 From 43b7129b94d2061418d5652eea97a1265569cd8b Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh@chollian.net>
 Date: Sat, 27 Jun 2015 18:09:41 +0900
-Subject: [PATCH 10/11] emxbind, ld: generate binaries like OMF linkers do
+Subject: [PATCH 10/13] emxbind, ld: generate binaries like OMF linkers do
 
 1. Append default extension if not specified
 

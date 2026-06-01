@@ -1,7 +1,7 @@
 From 13888f50846f560a124062b94be51fefd99af685 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Fri, 20 Feb 2026 22:19:14 +0900
-Subject: [PATCH 03/11] weakld: fix crash in WLDDestroy()
+Subject: [PATCH 03/13] weakld: fix crash in WLDDestroy()
 
 Trying to fclose() the already fclose()ed file pointer causes a
 crash. This occurs if pMod->phFile is the same as

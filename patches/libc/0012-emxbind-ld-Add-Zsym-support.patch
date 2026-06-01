@@ -1,0 +1,150 @@
+From ac3cce82f78aaff9f62c31ae703e96fdbc1bc3de Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Mon, 1 Jun 2026 22:34:05 +0900
+Subject: [PATCH 12/13] emxbind, ld: Add -Zsym support
+
+---
+ src/emx/src/emxbind/emxbind.c |  6 +++++-
+ src/emx/src/emxbind/emxbind.h |  4 ++++
+ src/emx/src/emxbind/map.c     | 20 ++++++++++++++++++++
+ src/emx/src/ld/ld.c           | 14 ++++++++++++++
+ 4 files changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index a7f8862..f2a62ef 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -86,6 +86,7 @@ static void usage (void)
+   puts ("  -h<size>    set heap size for OS/2 (-b only)");
+   puts ("  -k<size>    set stack size for OS/2 (-b only)");
+   puts ("  -m<map>     write .map file (-b only)");
++  puts ("  -y          write .sym file (-b and -m)");
+   puts ("  -r<res>     add resources (-b only)");
+   exit (1);
+ }
+@@ -341,7 +342,7 @@ static void get_args (void)
+   /* Examine the initial (emxbind) options, one by one. */
+ 
+   while ((c = getopt (gargc, gargv,
+-                      "bc::d::efh:k:m:o:pqr:svw")) != -1)
++                      "bc::d::efh:k:m:o:pqr:svwy")) != -1)
+     {
+       switch (c)
+ 	{
+@@ -413,6 +414,9 @@ static void get_args (void)
+ 	case 'w':
+ 	  opt_w = TRUE;
+ 	  break;
++	case 'y':
++	  opt_y = TRUE;
++	  break;
+ 	default:
+ 	  error ("invalid option");
+ 	}
+diff --git a/src/emx/src/emxbind/emxbind.h b/src/emx/src/emxbind/emxbind.h
+index f141836..1cb8b8c 100644
+--- a/src/emx/src/emxbind/emxbind.h
++++ b/src/emx/src/emxbind/emxbind.h
+@@ -212,6 +212,10 @@ EXTERN int opt_s INIT (FALSE);
+ 
+ EXTERN int opt_w INIT (FALSE);
+ 
++/* Create a symbol file.  This flag is set by the -y option. */
++
++EXTERN int opt_y INIT (FALSE);
++
+ /* The module name. */
+ 
+ EXTERN char *module_name INIT (NULL);
+diff --git a/src/emx/src/emxbind/map.c b/src/emx/src/emxbind/map.c
+index b218492..aa32b56 100644
+--- a/src/emx/src/emxbind/map.c
++++ b/src/emx/src/emxbind/map.c
+@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
+ #include <stdlib.h>
+ #include <string.h>
+ #include <alloca.h>
++#include <process.h>
+ #include "defs.h"
+ #include "emxbind.h"
+ 
+@@ -275,6 +276,22 @@ static void map_entrypoint (void)
+ }
+ 
+ 
++/* Write the .sym file. */
++
++static void write_sym (const char *map_fname)
++{
++  char *comspec;
++
++  comspec = getenv ("COMSPEC");
++  if (comspec == NULL)
++    comspec = "cmd.exe";
++
++  /* Invoke mapsym.cmd. */
++  if (spawnlp (P_WAIT, comspec, comspec, "/c", "mapsym.cmd", "link386",
++               map_fname, NULL) == -1)
++    error ("cannot spawn mapsym.cmd");
++}
++
+ /* Write the .map file. */
+ 
+ void write_map (const char *fname)
+@@ -309,4 +326,7 @@ void write_map (const char *fname)
+     error ("Cannot write `%s'", fname);
+   if (fclose (map_file) != 0)
+     error ("Cannot close `%s'", fname);
++
++  if (opt_y)
++    write_sym (fname);
+ }
+diff --git a/src/emx/src/ld/ld.c b/src/emx/src/ld/ld.c
+index 29ae982..ebaba48 100644
+--- a/src/emx/src/ld/ld.c
++++ b/src/emx/src/ld/ld.c
+@@ -715,6 +715,7 @@ int reloc_flag = 0;
+ int dll_flag = 0;
+ int exe_flag = 0;
+ int map_flag = 0;
++int sym_flag = 0;
+ int stack_size = 0;
+ int emxbind_strip = 0;
+ enum exe_bind_type
+@@ -1106,6 +1107,7 @@ static struct option longopts[] =
+   {"Zrsx32", 0, 0, 141},        /* Create Win32/DOS win32 base */
+   {"Zemx32", 0, 0, 142},        /* Create Win32/DOS emx base */
+   {"Zdll", 0, 0, 143},          /* Create .dll file */
++  {"Zsym", 0, 0, 144},          /* Create .sym file */
+   {"S", 0, 0, 'S'},
+   {"T", 1, 0, 'T'},
+   {"Ttext", 1, 0, 'T'},
+@@ -1310,6 +1312,10 @@ decode_command (argc, argv)
+           dll_flag = 1;
+           break;
+ 
++        case 144:               /* -Zsym */
++          sym_flag = 1;
++          break;
++
+         case 'R':
+ 	  reloc_flag = 1;
+ 	  break;
+@@ -4053,6 +4059,14 @@ write_output (void)
+           strcat (nargv[i], map_filename);
+ 	  i++;
+ 	}
++      if (sym_flag)
++	{
++	  if (!map_flag)
++	    fatal ("%s", "-Zsym without -Zmap.");
++	  freeav[j++] = nargv[i] = ALLOCA (3);
++	  strcpy (nargv[i], "-y");
++	  i++;
++	}
+       if (res_filename != NULL)
+ 	{
+ 	  freeav[j++] = nargv[i] = ALLOCA (strlen (res_filename) + 3);
+-- 
+2.43.0
+
