@@ -32,7 +32,7 @@ RM := rm -f
 
 %-aout.exe: %.o %-aout.res
 	echo "NAME $(basename $@) WINDOWAPI" > $@.def
-	$(LD) $(LDFLAGS) -Zmap -o $@ $^ $@.def
+	$(LD) $(LDFLAGS) -Zmap -Zsym -o $@ $^ $@.def
 
 %-omf.exe: %.obj %-omf.res
 	echo "NAME $(basename $@) WINDOWAPI" > $@.def

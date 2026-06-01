@@ -26,13 +26,13 @@ all: test
 test: dllmain-aout.exe dllmain-omf.exe dll-aout.dll dll-omf.dll
 
 dllmain-aout.exe: dllmain.o dllmod.a
-	$(LD) $(LDFLAGS) -Zmap -o $@ $^
+	$(LD) $(LDFLAGS) -Zmap -Zsym -o $@ $^
 
 dllmod.a: dll-aout.dll
 	$(EMXIMP) -o $@ $<
 
 dll-aout.dll: dllmod.o dllmod2.o dll-aout.def
-	$(LD) -Zdll -o $@ $^
+	$(LD) -Zdll -Zmap -Zsym -o $@ $^
 
 dll-aout.def: dllmod.o
 	echo "LIBRARY $(basename $@) INITINSTANCE TERMINSTANCE" > $@
