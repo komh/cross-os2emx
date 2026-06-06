@@ -1,7 +1,7 @@
-From 671c7d961a0cbf554f9919aa945148b5973df6e0 Mon Sep 17 00:00:00 2001
+From b34b1832dc06dfca49b7aeec082408bfc9dac9de Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Mon, 1 Jun 2026 23:21:12 +0900
-Subject: [PATCH 13/13] emxbind, ld: Add -Zsym support on non-OS/2 platforms
+Subject: [PATCH 13/15] emxbind, ld: Add -Zsym support on non-OS/2 platforms
 
 ---
  src/emx/src/emxbind/map.c | 8 ++++++++

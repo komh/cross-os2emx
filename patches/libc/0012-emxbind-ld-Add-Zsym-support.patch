@@ -1,7 +1,7 @@
-From ac3cce82f78aaff9f62c31ae703e96fdbc1bc3de Mon Sep 17 00:00:00 2001
+From 4ccf8cd6eb2fd6193d859c4ce3ef41fc67858f2b Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Mon, 1 Jun 2026 22:34:05 +0900
-Subject: [PATCH 12/13] emxbind, ld: Add -Zsym support
+Subject: [PATCH 12/15] emxbind, ld: Add -Zsym support
 
 ---
  src/emx/src/emxbind/emxbind.c |  6 +++++-
