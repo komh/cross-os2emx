@@ -58,11 +58,15 @@ jobs:
 
       - name: Set PATH for macOS-arm64
         if: matrix.name == 'macos-arm64'
-        run: echo "PATH=$(echo /opt/homebrew/Cellar/coreutils/*/libexec/gnubin):$(echo /opt/homebrew/Cellar/make/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+        run: |
+          echo "/opt/homebrew/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
+          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Set PATH for macOS-x64
         if: matrix.name == 'macos-x64'
-        run: echo "PATH=$(echo /usr/local/Cellar/coreutils/*/libexec/gnubin):$(echo /usr/local/Cellar/make/*/libexec/gnubin):${PATH}" >> $GITHUB_ENV
+        run: |
+          echo "/usr/local/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
+          echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Bootstrap
         run: ./bootstrap
