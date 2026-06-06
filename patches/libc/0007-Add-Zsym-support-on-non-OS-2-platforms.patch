@@ -1,7 +1,7 @@
-From 0bf4409eff50f95f649493ce539762fe2ba31494 Mon Sep 17 00:00:00 2001
+From 2dd9c6786b6fdbb2e1cdadbe978fa9f80ffd2185 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Tue, 28 Apr 2026 00:43:58 +0900
-Subject: [PATCH 07/13] Add -Zsym support on non-OS/2 platforms
+Subject: [PATCH 07/15] Add -Zsym support on non-OS/2 platforms
 
 ---
  src/emx/src/emxomf/emxomfld.c | 6 ++++++

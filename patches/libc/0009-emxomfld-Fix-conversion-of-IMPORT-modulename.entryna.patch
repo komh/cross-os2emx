@@ -1,7 +1,7 @@
-From 14391bad5276bc983aece7cb776dc6feba0c548c Mon Sep 17 00:00:00 2001
+From e26067b163e293acbdb153ed886a6ec35463e77d Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh@chollian.net>
 Date: Wed, 31 Jul 2019 15:49:41 +0900
-Subject: [PATCH 09/13] emxomfld: fix conversion of `IMPORT
+Subject: [PATCH 09/15] emxomfld: Fix conversion of `IMPORT
  modulename.entryname' on WLINK mode
 
 emxomfld does not convert `IMPORT modulename.entryname' of .def to

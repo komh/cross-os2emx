@@ -1,0 +1,142 @@
+From 02ee062366bc415da1b1c2c1e71a1a55df0a4f10 Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sat, 6 Jun 2026 13:52:03 +0900
+Subject: [PATCH 14/15] emxbind: Fix -s command
+
+---
+ src/emx/src/emxbind/cmd.c     |  3 ++
+ src/emx/src/emxbind/emxbind.c |  2 +-
+ src/emx/src/emxbind/emxbind.h |  1 +
+ src/emx/src/emxbind/utils.c   | 77 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 82 insertions(+), 1 deletion(-)
+
+diff --git a/src/emx/src/emxbind/cmd.c b/src/emx/src/emxbind/cmd.c
+index 25bd82d..7c2470a 100644
+--- a/src/emx/src/emxbind/cmd.c
++++ b/src/emx/src/emxbind/cmd.c
+@@ -58,6 +58,9 @@ static void strip_symbols (void)
+   long size, pos;
+   int str_len;                  /* komh: was long */
+ 
++  my_seek_hdr (&inp_file);
++  read_a_out_header ();
++
+   pos = a_in_pos + a_in_sym;
+   size = my_size (&inp_file);
+   if (pos + sizeof (str_len) <= size)
+diff --git a/src/emx/src/emxbind/emxbind.c b/src/emx/src/emxbind/emxbind.c
+index f2a62ef..271a3b0 100644
+--- a/src/emx/src/emxbind/emxbind.c
++++ b/src/emx/src/emxbind/emxbind.c
+@@ -306,7 +306,7 @@ static void file_name (char *dst, const char *ext, const char *def)
+     char *curext = _getext2 (dst);
+     if (curext && *curext == '.')
+       curext++;
+-    if (strcmp (curext, ext))
++    if (!(mode == 's' && stricmp (curext, "dll") == 0) && strcmp (curext, ext))
+     {
+       if (strlen (dst) > FNAME_SIZE - 5)
+         error ("file name too long");
+diff --git a/src/emx/src/emxbind/emxbind.h b/src/emx/src/emxbind/emxbind.h
+index 1cb8b8c..cbdb747 100644
+--- a/src/emx/src/emxbind/emxbind.h
++++ b/src/emx/src/emxbind/emxbind.h
+@@ -535,6 +535,7 @@ void my_change (struct file *dst, struct file *src);
+ void my_open (struct file *f, const char *name, enum open_mode mode);
+ void my_close (struct file *f);
+ void my_remove (struct file *f);
++int my_seek_hdr (struct file *f);
+ int my_readable (const char *name);
+ void *xmalloc (size_t n);
+ void *xrealloc (void *p, size_t n);
+diff --git a/src/emx/src/emxbind/utils.c b/src/emx/src/emxbind/utils.c
+index cb01bcc..b54babf 100644
+--- a/src/emx/src/emxbind/utils.c
++++ b/src/emx/src/emxbind/utils.c
+@@ -254,6 +254,83 @@ void my_change (struct file *dst, struct file *src)
+ }
+ 
+ 
++/* Seek to the aout header. */
++
++int my_seek_hdr (struct file *f)
++{
++  struct
++    {
++      char magic[2];
++      char fill1[6];
++      unsigned short hdr_size;
++    } exe_hdr;
++  struct
++    {
++      char sig[16];
++      char bound;
++      char fill1;
++      unsigned short hdr_loc_lo;      /* cannot use long, alignment! */
++      unsigned short hdr_loc_hi;
++    } patch;
++  long original_pos;
++  int saved_errno;
++
++  original_pos = my_tell (f);
++  my_read (&exe_hdr, sizeof (exe_hdr), f);
++  if (memcmp (exe_hdr.magic, "MZ", 2) != 0)
++    {
++      my_seek (f, original_pos);
++      return 0;
++    }
++  my_seek (f, original_pos + 16 * exe_hdr.hdr_size);
++  my_read (&patch, sizeof (patch), f);
++  if (memcmp (patch.sig, "emx", 3) == 0)
++    my_seek (f, original_pos + patch.hdr_loc_lo + 65536L * patch.hdr_loc_hi);
++  else if (memcmp (patch.sig, "OS/2", 4) == 0)
++    {
++      struct
++        {
++          short fill1[12];
++          unsigned short lfarlc;
++          short fill2[17];
++          long lfanew;
++        } mz_hdr;
++      struct
++        {
++          char magic[2];
++          char fill1[2];
++          long fill2[31];
++          unsigned long data_page;
++        } lx_hdr;
++
++      /* rewind */
++      my_seek (f, original_pos);
++      my_read (&mz_hdr, sizeof (mz_hdr), f);
++      /* check if a LX header exists */
++      if (mz_hdr.lfarlc != 0x40)
++        goto failure;
++      /* seek to the LX header */
++      my_seek (f, mz_hdr.lfanew);
++      my_read (&lx_hdr, sizeof (lx_hdr), f);
++      /* check if real LX header */
++      if (memcmp (&lx_hdr.magic, "LX", 2) != 0)
++        goto failure;
++      /* seek to the aout header with ZMAGIC */
++      my_seek (f, lx_hdr.data_page - 1024);
++      return 0;
++    }
++  else
++    goto failure;
++  return 0;
++
++failure:
++  saved_errno = errno;
++  my_seek (f, original_pos);
++  errno = saved_errno;
++  return -1;
++}
++
++
+ /* Return true iff the file NAME is readable. */
+ 
+ int my_readable (const char *name)
+-- 
+2.43.0
+
