@@ -1,7 +1,7 @@
-From e75dcad13fe89aaa74ae4d5ce1db007c846bc494 Mon Sep 17 00:00:00 2001
+From f1fc4ef16e6e2564a36f20b59c9e712388293205 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Wed, 25 Mar 2026 19:42:23 +0900
-Subject: [PATCH 3/5] Fix build break and clean up
+Subject: [PATCH 3/7] Fix build break and clean up
 
 1. chmod a+x autogen.sh
 
