@@ -1,0 +1,195 @@
+From dde946702dc0442f56e7c9ab1098f51f477be24c Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Mon, 15 Jun 2026 15:16:05 +0900
+Subject: [PATCH 7/7] Fix `strip' command
+
+---
+ bfd/i386aoutemx.c  |  11 +++--
+ binutils/objcopy.c | 114 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 122 insertions(+), 3 deletions(-)
+
+diff --git a/bfd/i386aoutemx.c b/bfd/i386aoutemx.c
+index b425e99f..b0a82069 100644
+--- a/bfd/i386aoutemx.c
++++ b/bfd/i386aoutemx.c
+@@ -160,7 +160,11 @@ static const struct aout_backend_data MY(backend_data) = {
+ 
+ #include "aout-target.h"
+ 
+-static int seek_hdr (bfd *abfd)
++int emx_seek_hdr (bfd *abfd);
++
++/* Replacement for _fseek_hdr().  */
++int
++emx_seek_hdr (bfd *abfd)
+ {
+   struct
+     {
+@@ -238,7 +242,8 @@ static int seek_hdr (bfd *abfd)
+ 
+ failure:
+   saved_errno = errno;
+-  bfd_seek (abfd, original_pos, SEEK_SET);
++  /* ignore error code of bfd_seek() and make compiler happy with (void)! */
++  (void)!bfd_seek (abfd, original_pos, SEEK_SET);
+   errno = saved_errno;
+   return -1;
+ }
+@@ -258,7 +263,7 @@ MY(object_p) (abfd)
+   file_ptr org_pos, hdrofs;
+ 
+   org_pos = bfd_tell (abfd);
+-  seek_hdr (abfd);
++  emx_seek_hdr (abfd);
+   hdrofs = bfd_tell (abfd) - org_pos;
+ 
+   if (bfd_read ((void *) &exec_bytes, amt, abfd) != amt)
+diff --git a/binutils/objcopy.c b/binutils/objcopy.c
+index 2e6f7cdf..c664ae40 100644
+--- a/binutils/objcopy.c
++++ b/binutils/objcopy.c
+@@ -3832,6 +3832,62 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
+   return ok;
+ }
+ 
++#ifdef EMX
++/* Copy 'input_filename' to 'output_filename' in ['offset', 'offset' + 'n'). If
++   'append' is TRUE, append to 'output_filename'.  */
++
++static bool
++copy_bytes (const char *input_filename, const char *output_filename,
++            off_t offset, size_t n, bool append)
++{
++  FILE *ifp = NULL;
++  FILE *ofp = NULL;
++  char buf[1024];
++  size_t rem;
++  size_t blen = 0, rlen = 0;
++  bool ok = false;
++
++  ifp = fopen (input_filename, "rb");
++  if (ifp == NULL)
++    goto error_out;
++
++  if (n == (size_t)-1)
++    {
++      if (fseek (ifp, 0, SEEK_END) == -1
++          || (rem = ftell (ifp)) == (size_t)-1)
++        goto error_out;
++    }
++  else
++    rem = n;
++
++  if (fseek (ifp, offset, SEEK_SET) == -1)
++    goto error_out;
++
++  ofp = fopen (output_filename, append ? "ab" : "wb");
++  if (ofp == NULL)
++    goto error_out;
++
++  while (rem > 0 && rlen == blen)
++    {
++      blen = rem < sizeof buf ? rem : sizeof buf;
++      rlen = fread (buf, 1, blen, ifp);
++      fwrite (buf, 1, rlen, ofp);
++      rem -= rlen;
++    }
++
++  ok = rem == 0;
++
++error_out:
++
++  if (ofp != NULL)
++    fclose (ofp);
++  if (ifp != NULL)
++    fclose (ifp);
++
++  return ok;
++}
++#endif
++
+ /* The top-level control.  */
+ 
+ static void
+@@ -4004,6 +4060,10 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+   else if (bfd_check_format_matches (ibfd, bfd_object, &obj_matching))
+     {
+       bfd *obfd;
++#ifdef EMX
++      bool need_postprocess;
++      file_ptr ihptr = 0;
++#endif
+     do_copy:
+ 
+       /* bfd_get_target does not return the correct value until
+@@ -4029,6 +4089,16 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+       if (! copy_object (ibfd, obfd, input_arch))
+ 	status = 1;
+ 
++#ifdef EMX
++      extern int emx_seek_hdr (bfd *);
++      need_postprocess = status == 0
++                         && bfd_get_flavour (ibfd) == bfd_target_aout_flavour
++                         && bfd_get_flavour (obfd) == bfd_target_aout_flavour
++                         && bfd_seek (ibfd, 0, SEEK_SET) == 0
++                         && emx_seek_hdr (ibfd) == 0
++                         && (ihptr = bfd_tell (ibfd)) > 0;
++#endif
++
+       /* PR 17512: file: 0f15796a.
+ 	 If the file could not be copied it may not be in a writeable
+ 	 state.  So use bfd_close_all_done to avoid the possibility of
+@@ -4044,6 +4114,50 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+ 	  status = 1;
+ 	  bfd_nonfatal_message (input_filename, NULL, NULL, NULL);
+ 	}
++
++#ifdef EMX
++      /* Post process for a.out-emx. Bind LX header of 'input_file' and
++         aout body of 'output_file'.  */
++      if (status == 0 && need_postprocess)
++        {
++          int tmpfd = -1;
++          char *tmpname = make_tempname (output_filename, &tmpfd);
++
++          if (tmpname == NULL || tmpfd == -1)
++            {
++              status = 1;
++              bfd_nonfatal_message (output_filename, NULL, NULL, NULL);
++              return;
++            }
++
++          if (!copy_bytes (input_filename, tmpname, 0, ihptr, false))
++            {
++              status = 1;
++              bfd_nonfatal_message (input_filename, NULL, NULL, NULL);
++            }
++
++          if (status == 0
++              && !copy_bytes (output_filename, tmpname, 0, (size_t)-1, true))
++            {
++              status = 1;
++              bfd_nonfatal_message (output_filename, NULL, NULL, NULL);
++            }
++
++          if (status == 0
++              && smart_rename (tmpname, output_filename, tmpfd, in_stat,
++                               preserve_dates) == -1)
++            {
++              status = 1;
++              bfd_nonfatal_message (tmpname, NULL, NULL, NULL);
++            }
++
++          if (status != 0)
++            {
++              close (tmpfd);
++              unlink_if_ordinary (tmpname);
++            }
++        }
++#endif
+     }
+   else
+     {
+-- 
+2.43.0
+
