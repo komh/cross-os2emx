@@ -7,9 +7,7 @@ TARGETINCDIR := $(PREFIX)/$(TARGET)/include
 
 REPODIR := fluidsynth-os2.git
 
-CMAKEOPTS := -DCMAKE_C_FLAGS="-idirafter $(TARGETINCDIR)/os2tk45" \
-	         -DCMAKE_CXX_FLAGS="-idirafter $(TARGETINCDIR)/os2tk45" \
-	         -Dosal=cpp11 \
+CMAKEOPTS := -Dosal=cpp11 \
 			 -Denable-libinstpatch=0 \
 			 -DCMAKE_TOOLCHAIN_FILE=$(PREFIX)/share/cmake/cross/$(TARGET).cmake
 
