@@ -2,6 +2,8 @@
 libc-i686-pc-os2-emx
 autotools
 meson/*.txt
+meson/meson-*
+meson/meson.done
 cmake/*.cmake
 extras/setemxenv
 .DS_store

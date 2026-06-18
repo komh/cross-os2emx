@@ -55,8 +55,15 @@ GCCDIR := gcc-os2-ps
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 SETEMXENV := $(EXTRASDIR)/setemxenv
+
+MESONDIR := meson
+MESONVER := 1.11.1
+MESONTGZ := meson-$(MESONVER).tar.gz
+MESONTGZXDIR := $(MESONTGZ:.tar.gz=)
+MESONTGZURL := https://github.com/mesonbuild/meson/releases/download/$(MESONVER)/$(MESONTGZ)
+MESONCROSSFILE := $(MESONDIR)/$(TARGETSPEC)
+
 CMAKEDIR := cmake-os2
-MESONCROSSFILE := meson/$(TARGETSPEC)
 CMAKECROSSFILE := cmake/$(TARGETSPEC).cmake
 
 LIBCZIP := libc-0_1_14-1_oc00.zip
@@ -171,7 +178,8 @@ all-gcc: all-autotools install-binutils install-libc install-emxtools \
 
 .PHONY: all-meson
 all: all-meson
-all-meson: $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt
+all-meson: $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt \
+           $(MESONDIR)/meson.done
 
 $(MESONCROSSFILE)-aout.txt: $(MESONCROSSFILE)-aout.txt.in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
@@ -180,6 +188,14 @@ $(MESONCROSSFILE)-aout.txt: $(MESONCROSSFILE)-aout.txt.in
 $(MESONCROSSFILE)-omf.txt: $(MESONCROSSFILE)-omf.txt.in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       -e 's,@TARGETCPU@,$(TARGETCPU),g' < $< > $@
+
+$(MESONDIR)/meson.done: $(MESONDIR)/$(MESONTGZ)
+	$(TARX) $(MESONDIR)/$(MESONTGZ) -C $(MESONDIR)
+	$(TOUCH) $@
+
+$(MESONDIR)/$(MESONTGZ):
+	$(MKDIR_P) $(MESONDIR)
+	cd $(MESONDIR); $(WGET) $(MESONTGZURL)
 
 .PHONY: all-cmake
 all: all-cmake
@@ -271,6 +287,9 @@ install-meson: all-meson
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE)-aout.txt)
 	$(INSTALLDATA) -D $(MESONCROSSFILE)-omf.txt \
 	  $(DESTDIR)$(SHAREDIR)/meson/cross/$(notdir $(MESONCROSSFILE)-omf.txt)
+	$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	$(CP) -a $(MESONDIR)/$(MESONTGZXDIR) $(DESTDIR)$(BINDIR)
+	$(LN_S) -f $(MESONTGZXDIR)/meson.py $(DESTDIR)$(BINDIR)/meson
 
 .PHONY: install-cmake
 install: install-cmake
@@ -344,6 +363,9 @@ clean-gcc:
 clean: clean-meson
 clean-meson:
 	$(RM) $(MESONCROSSFILE)-aout.txt $(MESONCROSSFILE)-omf.txt
+	$(RM) $(MESONDIR)/$(MESONTGZ)
+	$(RM) -r $(MESONDIR)/$(MESONTGZXDIR)
+	$(RM) $(MESONDIR)/meson.done
 
 .PHONY: clean-cmake
 clean: clean-cmake
