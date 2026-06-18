@@ -54,6 +54,7 @@ LIBCDIR := libc
 GCCDIR := gcc-os2-ps
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
+SETEMXENV := $(EXTRASDIR)/setemxenv
 CMAKEDIR := cmake-os2
 MESONCROSSFILE := meson/$(TARGETSPEC)
 CMAKECROSSFILE := cmake/$(TARGETSPEC).cmake
@@ -145,6 +146,15 @@ all: all-emxtools
 all-emxtools: all-binutils
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross
 
+.PHONY: all-extras
+all: all-extras
+all-extras: $(SETEMXENV)
+
+$(SETEMXENV): $(SETEMXENV).in
+	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
+	       < $< > $@
+	chmod +x $@
+
 .PHONY: all-gcc
 all: all-gcc
 all-gcc: all-autotools install-binutils install-libc install-emxtools \
@@ -228,11 +238,12 @@ install-emxtools: all-emxtools
 
 .PHONY: install-extras
 install: install-extras
-install-extras:
+install-extras: all-extras
 	$(INSTALL) -d $(DESTDIR)$(TARGETBINDIR)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	for f in "$(EXTRASDIR)/"* "$(EXTRASDIR)/$(SYSNAME)/"* ; do \
 	  test -f $$f || continue; \
+	  test "$${f%.in}" = "$$f" || continue; \
 	  n=$$(basename $$f); \
 	  if test -L $$f || test ! -x $$f ; then \
 	    $(CP) -a $$f $(DESTDIR)$(TARGETBINDIR)/$$n; \

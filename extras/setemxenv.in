@@ -1,0 +1,6 @@
+#!/bin/sh
+
+if ! which emximp > /dev/null 2>&1; then
+  export PATH="@PREFIX@/bin:$PATH"
+  export GCCOPT="$GCCOPT -idirafter @PREFIX@/@TARGETSPEC@/include/os2tk45"
+fi
