@@ -14,3 +14,5 @@ endian = 'little'
 [properties]
 sys_root = '@PREFIX@'
 pkg_config_libdir = '@PREFIX@/@TARGETSPEC@/lib/pkgconfig'
+c_args = ['-idirafter', '@PREFIX@/@TARGETSPEC@/include/os2tk45']
+cpp_args = ['-idirafter', '@PREFIX@/@TARGETSPEC@/include/os2tk45']
