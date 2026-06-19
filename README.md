@@ -76,6 +76,63 @@ Tested hosts:
     * Added `gcc` v9.2.0
         * Always link to `libgcc.a`
 
+# How to use
+
+Here are the examples.
+
+1. Set env vars for cross-os2emx
+
+You should set env vars such as PATH for cross-os2emx like:
+
+```
+. setemxenv
+```
+
+2. autotools
+
+```
+./configure --host=i686-pc-os2-emx
+```
+
+3. meson
+
+For `aout`:
+```
+meson setup build_dir -Dos2_emxomf=false --cross-file=$HOME/opt/os2emx/share/meson/cross/i686-pc-os2-emx-aout.txt
+```
+
+You can omit `-Dos2_emxomf=false` for aout.
+
+For `omf`:
+
+```
+meson setup build_dir -Dos2_emxomf=true --cross-file=$HOME/opt/os2emx/share/meson/cross/i686-pc-os2-emx-omf.txt
+```
+
+4. CMake
+
+```
+cmake -S . -B build_dir -DCMAKE_TOOLCHAIN_FILE=$HOME/opt/os2emx/share/cmake/cross/i686-pc-os2-emx.cmake
+```
+
+5. Others
+
+```
+export CC=i686-pc-os2-emx-gcc
+export CXX=i686-pc-os2-emx-g++
+export AR=i686-pc-os2-emx-ar
+export STRIP=i686-pc-os2-emx-strip
+and so on
+```
+
+If you use `-Zomf` to compile sources not to link, then you should set `AR` to `i686-pc-os2-emx-emxomfar` like:
+
+```
+export AR=i686-pc-os2-emx-emxomfar
+```
+
+**NOTE**: You should modify the path to/in the above files to the proper ones according to your system env.
+
 # How to install additional libs with `installrpmzip`
 
 1. Find the necessary libs at https://rpm.netlabs.org/release/00/zip
