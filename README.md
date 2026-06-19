@@ -18,6 +18,9 @@ Tested hosts:
 
 # History
 
+* cross-os2emx v1.3.1 (2026/06/20)
+    * Fixed `c_args` and `cpp_args` of `meson` is in `[properties]` section not in `[built-in options]` section.
+
 * cross-os2emx v1.3.0 (2026/06/19)
     * Added `-Zsym` support to `emxbind` and `ld`
     * Added include path for `os2tk45` to the cross files of `meson` and `CMake`
