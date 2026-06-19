@@ -101,6 +101,8 @@ jobs:
         if: "startsWith(github.ref, 'refs/tags/')"
         uses: softprops/action-gh-release@v2
         with:
+          name: cross-os2emx v${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           files: cross-os2emx-*-${{ matrix.name }}.tar.gz
           generate_release_notes: ${{ matrix.name == 'linux-x64' }}
         env:
