@@ -2,11 +2,12 @@
 
 This is a cross compilation toolchain for `i686-pc-os2-emx` target.
 
-This consists of `binutils`, `gcc`, `LIBCn`, `CMake`, `libtool`, and some build tools.
+This consists of `binutils`, `gcc`, `LIBCn`, `meson`, `CMake`, `libtool`, and some build tools.
 
 * `binutils` is v2.44 from https://github.com/psmedley/binutils-os2
 * `gcc` is v15.2.0 from https://github.com/psmedley/gcc-os2
 * `LIBCn` is v0.1.14 from https://github.com/bitwiseworks/libc
+* `meson` is v1.11.1 from https://github.com/mesonbuild/meson
 * `CMake` is v3.31.7 from https://github.com/bitwiseworks/cmake-os2
 * `libtool` is v2.5.4 from https://github.com/komh/libtool-os2
 
@@ -16,6 +17,17 @@ Tested hosts:
 * aarch64-apple-darwin
 
 # History
+
+* cross-os2emx v1.3.0 (2026/06/19)
+    * Added `-Zsym` support to `emxbind` and `ld`
+    * Added include path for `os2tk45` to the cross files of `meson` and `CMake`
+    * Added `setemxenv` script to help to set env vars for `cross-os2emx`
+        * Use `source setemxenv` or use alias for this
+    * Added `meson` v1.11.1
+    * macOS: Added `lxlite` stub
+    * macOS: Updated `kdllar`
+    * Fixed `emxbind -s` command and `strip` command for aout binaries
+    * Linux: Fixed `kmapsym` does not recognize `Address Export Alias` block
 
 * cross-os2emx v1.2.0 (2026/05/26)
     * Added macOS support by @josch1710
