@@ -1,13 +1,36 @@
 #! /bin/sh
 
+set -e
+
 myname=$(basename $0)
 mydir=$(dirname $0)
 
-package="$1"
-destdir="$2"
+opt_d=false
 
-if [ -z "$package" ] ; then
-  echo "Usage: $myname package[_oc00[.zip]] [destdir]"
+for p in "$@"; do
+  # destdir should be the last
+  if [ -n "$destdir" ]; then
+    packages=""
+    break
+  fi
+
+  case "$p" in
+    -d)
+      opt_d=true
+      ;;
+    *)
+      if $opt_d; then
+        destdir="$p"
+        opt_d=false
+      else
+        packages="$packages${packages:+ }$p"
+      fi
+      ;;
+  esac
+done
+
+if [ -z "$packages" ] || $opt_d ; then
+  echo "Usage: $myname package[_oc00[.zip]] ... [-d destdir]"
   echo
   echo "This will install package[_oc00[.zip] to destdir."
   echo "If destdir is omitted, destdir will be i686-pc-os2-emx of" \
@@ -21,24 +44,60 @@ prefix=$mydir/..
 target=i686-pc-os2-emx
 targetprefix=${destdir:-"$prefix/$target"}
 
-: ${WGET:=wget}
+: ${CURL:=curl -sSfL}
+: ${SED:=sed}
+: ${SORT:=sort}
+: ${GREP:=grep}
 : ${UNZIP:=unzip}
 : ${MKDIR_P:=mkdir -p}
 : ${CP:=cp}
 : ${RM:=rm}
 
 zipurl="https://rpm.netlabs.org/release/00/zip"
+ziplst="$myname.zip.lst"
+zipdir="$myname.zip.dir"
 
-# normalize package
-package=${package%.zip}
-package=${package%_oc00}
-package="${package}_oc00.zip"
+echo "Downloading the ZIP file list..."
+$CURL "$zipurl/" \
+  | $SED -n -e "s/^.*href=\"\(.*_oc00\.zip\)\".*$/\1/p" \
+  | $SORT -V > "$ziplst"
 
-$WGET "$zipurl/$package" &&
-  $UNZIP -u "$package" -d "$package.dir" &&
-  $MKDIR_P "$targetprefix" &&
-  for d in "$package.dir/@unixroot/usr"/* ; do
-    $CP -a "$d" "$targetprefix" || break
-  done
+echo "Checking the package(s)..."
+echo "  $packages"
+for package in $packages; do
+  # normalize package
+  z=${package%.zip}
+  z=${z%_oc00}
+  z="${z}_oc00.zip"
 
-$RM -rf "$package.dir" "$package"
+  # find the exact match first
+  z=$($GREP "^$z$" $ziplst) || :
+
+  if [ -z "$z" ]; then
+    # find the latest version with $package package name
+    z=$($GREP "^${package}[-_][0-9]" $ziplst | tail -n1) || :
+
+    [ -n "$z" ] || { echo "Package '$package' not found!"; exit 1; }
+  fi
+
+  zips="$zips $z"
+done
+
+echo "Downloading the ZIP(s)..."
+echo " $zips"
+$CURL $(echo "$zips" | $SED -e "s, , -O $zipurl/,g")
+
+echo "Unzipping the ZIP(s)..."
+echo " $zips"
+for z in $zips; do
+  $UNZIP -u "$z" -d "$zipdir"
+done
+
+echo "Installing the unzipped file(s)..."
+$MKDIR_P "$targetprefix"
+for d in "$zipdir/@unixroot/usr"/* ; do
+  $CP -a "$d" "$targetprefix" || break
+done
+
+echo "Cleaning up..."
+$RM -rf "$ziplst" $zips "$zipdir"
