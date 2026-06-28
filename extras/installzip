@@ -1,0 +1,68 @@
+#! /bin/sh
+
+set -e
+
+myname=$(basename $0)
+mydir=$(dirname $0)
+
+zipurl="$1"
+destdir="$2"
+
+if [ -z "$zipurl" ] ; then
+  echo "Usage: $myname URL_for_ZIP [destdir]"
+  echo
+  echo "This will install the ZIP to destdir."
+  echo "If destdir is omitted, destdir will be i686-pc-os2-emx of" \
+       "the parent dir of"
+  echo "the dir where $myname is. That is, dir/../i686-pc-os2-emx."
+  exit 1
+fi
+
+# assume we're in /opt/os2emx/bin directory
+prefix=$mydir/..
+target=i686-pc-os2-emx
+targetprefix=${destdir:-"$prefix/$target"}
+
+: ${CURL:=curl -sSfL}
+: ${UNZIP:=unzip}
+: ${MKDIR_P:=mkdir -p}
+: ${CP:=cp}
+: ${RM:=rm}
+
+zipdir="$myname.zip.dir"
+
+zip=${zipurl##*/}
+zip=${zip%\?*}
+if [ "${zip%.zip}" = "$zip" ] ; then
+  zip="${zip}.zip"
+fi
+
+echo "Downloading ${zipurl}..."
+$CURL -o "$zip" "$zipurl"
+
+echo "Unzipping $zip..."
+$UNZIP -u "$zip" -d "$zipdir"
+
+# find prefix of the ZIP
+zipprefix=""
+while read -r s d t p; do
+  case "$p" in
+    */bin/ | */include/ | */lib/ | */lib64/ | */share/)
+      zipprefix="/${p%/*/}"
+      break
+      ;;
+  esac
+done << EOF
+$($UNZIP -qql "$zip")
+EOF
+
+echo "Installing the unzipped file(s)..."
+$MKDIR_P "$targetprefix"
+for d in "$zipdir$zipprefix"/* ; do
+  if [ -d "$d" ] ; then
+    $CP -a "$d" "$targetprefix" || break
+  fi
+done
+
+echo "Cleaning up..."
+$RM -rf "$zip" "$zipdir"
