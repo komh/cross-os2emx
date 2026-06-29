@@ -1,6 +1,8 @@
 #!/bin/sh
 
 if ! which emximp > /dev/null 2>&1; then
-  export PATH="@PREFIX@/bin:$PATH"
+  export PATH="@PREFIX@/bin${PATH:+:}$PATH"
   export GCCOPT="$GCCOPT -idirafter @PREFIX@/@TARGETSPEC@/include/os2tk45"
+  export PKG_CONFIG_PATH="@PREFIX@/@TARGETSPEC@/lib/pkgconfig:@PREFIX@/lib/pkgconfig${PKG_CONFIG_PATH:+:}$PKG_CONFIG_PATH"
+  export ACLOCAL_PATH="@PREFIX@/@TARGETSPEC@/share/aclocal:@PREFIX@/share/aclocal${ACLOCAL_PATH:+:}$ACLOCAL_PATH"
 fi
