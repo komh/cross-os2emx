@@ -66,7 +66,7 @@ zipdir="$myname.zip.dir"
 
 echo "Downloading the ZIP file list..."
 $CURL "$zipurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*_oc00\.zip\)\".*$/\1/p" \
+  | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1/p" \
   | $SORT -V > "$ziplst"
 
 echo "Checking the package(s)..."

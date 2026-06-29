@@ -147,7 +147,7 @@ rpmdir="$myname.rpm.dir"
 
 echo "Downloading the RPM file list..."
 $CURL "$rpmarchurl/" "$rpmnoarchurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*\.oc00\.\($rpmarch\|$rpmnoarch\)\.rpm\)\".*$/\1/p" \
+  | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1/p" \
   | $SORT -V > "$rpmlst"
 
 echo "Checking the package(s)..."
