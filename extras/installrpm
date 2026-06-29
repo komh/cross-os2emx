@@ -1,0 +1,196 @@
+#! /bin/sh
+
+set -e
+
+be32()
+{
+  set -- $($OD -An -j "$1" -N 4 -t u1 "$2") || return 1
+  echo $((($1 << 24) | ($2 << 16) | ($3 << 8) | $4 ))
+}
+
+rpmhdrsize()
+{
+  off=$1
+  file=$2
+
+  nindex=$(be32 $((off + 8)) "$file") || return 1
+  hsize=$(be32 $((off + 12)) "$file") || return 1
+
+  echo $((16 + nindex * 16 + hsize))
+}
+
+rpmcpioofs()
+{
+  file=$1
+
+  # check RPM magic
+  set -- $($OD -An -N 4 -t x1 "$file") || return 1
+  if [  "$1 $2 $3 $4" != "ed ab ee db" ] ; then
+    echo "$file: not an RPM file"
+    return 1
+  fi
+
+  off=96
+
+  # signature header
+  sz=$(rpmhdrsize "$off" "$file") || return 1
+  off=$((off + ((sz + 7) & ~7)))
+
+  # main header
+  sz=$(rpmhdrsize "$off" "$file") || return 1
+  off=$((off + sz))
+
+  echo "$off"
+}
+
+rpm2cpio()
+{
+  file=$1
+  off=$(rpmcpioofs "$file") || return 1
+
+  set -- $($OD -An -j "$off" -N 6 -t x1 "$file") || return 1
+
+  case "$1 $2 $3 $4 $5 $6" in
+    '1f 8b '*) extr="$GZIP -dc" ;;
+    '42 5a 68 '*) extr="$BZIP2 -dc" ;;
+    'fd 37 7a 58 5a 00') extr="$XZ -dc" ;;
+    '28 b5 2f fd '*) extr="$ZSTD -dc" ;;
+    '30 37 30 37 30 31' | *) extr="$CAT" ;; # uncompressed or unknown method
+  esac
+
+  $DD if="$file" bs=1 skip="$off" 2> /dev/null | $extr
+}
+
+printlist()
+{
+  for e in "$@"; do
+    echo "    $e"
+  done
+}
+
+myname=$(basename $0)
+mydir=$(dirname $0)
+
+opt_a=false
+opt_d=false
+
+for p in "$@"; do
+  # destdir should be the last
+  if [ -n "$destdir" ]; then
+    packages=""
+    break
+  fi
+
+  case "$p" in
+    -a)
+      opt_a=true
+      ;;
+    -d)
+      opt_d=true
+      ;;
+    *)
+      if $opt_a; then
+        rpmarch="$p"
+        opt_a=false
+      elif $opt_d; then
+        destdir="$p"
+        opt_d=false
+      else
+        packages="$packages${packages:+ }$p"
+      fi
+      ;;
+  esac
+done
+
+if [ -z "$packages" ] || $opt_a || $opt_d ; then
+  echo "Usage: $myname package[.oc00[.arch[.rpm]]] ... [-a arch] [-d destdir]"
+  echo
+  echo "This will install package[.oc00[.arch[.rpm]]] to destdir without"\
+       "checking dependencies."
+  echo "arch should be one of noarch, i386, i686 and pentium4."
+  echo "If -a arch is omitted, arch will be penitum4." \
+       "i386, i686 and pentium4 available."
+  echo "If -d destdir is omitted, destdir will be i686-pc-os2-emx of" \
+       "the parent dir of"
+  echo "the dir where $myname is. That is, dir/../i686-pc-os2-emx."
+  exit 1
+fi
+
+# assume we're in /opt/os2emx/bin directory
+prefix="$mydir/.."
+target=i686-pc-os2-emx
+targetprefix="${destdir:-$prefix/$target}"
+
+: ${CURL:=curl -sSfL}
+: ${SED:=sed}
+: ${SORT:=sort}
+: ${GREP:=grep}
+: ${UNZIP:=unzip}
+: ${MKDIR_P:=mkdir -p}
+: ${OD:=od}
+: ${DD:=dd}
+: ${GZIP:=gzip}
+: ${BZIP2:=bzip2}
+: ${XZ:=xz}
+: ${ZSTD:=zstd}
+: ${CAT:=cat}
+: ${CPIO:=cpio}
+: ${CP:=cp}
+: ${RM:=rm}
+
+rpmarch=${rpmarch:-pentium4}
+rpmnoarch=noarch
+rpmarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmarch"
+rpmnoarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmnoarch"
+rpmlst="$myname.rpm.lst"
+rpmdir="$myname.rpm.dir"
+
+echo "Downloading the RPM file list..."
+$CURL "$rpmarchurl/" "$rpmnoarchurl/" \
+  | $SED -n -e "s/^.*href=\"\(.*\.oc00\.\($rpmarch\|$rpmnoarch\)\.rpm\)\".*$/\1/p" \
+  | $SORT -V > "$rpmlst"
+
+echo "Checking the package(s)..."
+printlist $packages
+for package in $packages; do
+  # normalize package
+  r="${package%.oc00*}"
+  r="$r.oc00"
+
+  # find the exact match first
+  r=$($GREP "^$r\.\($rpmarch\|$rpmnoarch\)\.rpm$" $rpmlst) || :
+
+  if [ -z "$r" ]; then
+    # find the latest version with $package package name
+    r=$($GREP "^${package}[-_.][0-9]" $rpmlst | tail -n1) || :
+
+    [ -n "$r" ] || { echo "Package '$package' not found!"; exit 1; }
+  fi
+
+  rpms="$rpms $r"
+  if [ "${r%.$rpmarch*}" != "$r" ] ; then
+    rpmurls="$rpmurls $rpmarchurl/$r"
+  else
+    rpmurls="$rpmurls $rpmnoarchurl/$r"
+  fi
+done
+
+echo "Downloading the RPM(s)..."
+printlist $rpms
+$CURL $(echo "$rpmurls" | $SED -e "s, , -O ,g")
+
+echo "Extracting the RPM(s)..."
+printlist $rpms
+$MKDIR_P "$rpmdir"
+for r in $rpms; do
+  rpm2cpio "$r" | (cd $rpmdir; $CPIO -idmv)
+done
+
+echo "Installing the extracted file(s)..."
+$MKDIR_P "$targetprefix"
+for d in "$rpmdir/@unixroot/usr"/* ; do
+  $CP -a "$d" "$targetprefix" || break
+done
+
+echo "Cleaning up..."
+$RM -rf "$rpmlst" $rpms "$rpmdir"
