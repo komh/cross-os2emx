@@ -2,6 +2,13 @@
 
 set -e
 
+printlist()
+{
+  for e in "$@"; do
+    echo "    $e"
+  done
+}
+
 myname=$(basename $0)
 mydir=$(dirname $0)
 
@@ -63,7 +70,7 @@ $CURL "$zipurl/" \
   | $SORT -V > "$ziplst"
 
 echo "Checking the package(s)..."
-echo "  $packages"
+printlist $packages
 for package in $packages; do
   # normalize package
   z=${package%.zip}
@@ -84,11 +91,11 @@ for package in $packages; do
 done
 
 echo "Downloading the ZIP(s)..."
-echo " $zips"
+printlist $zips
 $CURL $(echo "$zips" | $SED -e "s, , -O $zipurl/,g")
 
 echo "Unzipping the ZIP(s)..."
-echo " $zips"
+printlist $zips
 for z in $zips; do
   $UNZIP -u "$z" -d "$zipdir"
 done
