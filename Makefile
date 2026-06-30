@@ -55,6 +55,7 @@ GCCDIR := gcc-os2-ps
 EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 SETEMXENV := $(EXTRASDIR)/setemxenv
+PKGCONFIG := $(EXTRASDIR)/pkg-config
 
 MESONDIR := meson
 MESONVER := 1.11.1
@@ -155,9 +156,14 @@ all-emxtools: all-binutils
 
 .PHONY: all-extras
 all: all-extras
-all-extras: $(SETEMXENV)
+all-extras: $(SETEMXENV) $(PKGCONFIG)
 
 $(SETEMXENV): $(SETEMXENV).in
+	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
+	       < $< > $@
+	chmod +x $@
+
+$(PKGCONFIG): $(PKGCONFIG).in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       < $< > $@
 	chmod +x $@
@@ -353,6 +359,11 @@ clean-libc:
 clean: clean-emxtools
 clean-emxtools:
 	$(MAKE) -C $(EMXDIR) -f Makefile.cross clean
+
+.PHONY: clean-extras
+clean: clean-extras
+clean-extras:
+	$(RM) $(SETEMXENV) $(PKGCONFIG)
 
 .PHONY: clean-gcc
 clean: clean-gcc
