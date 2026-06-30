@@ -1,0 +1,41 @@
+#!/bin/sh
+# PKG_CONFIG_WRAPPER_SIGNATURE: cross-os2emx
+
+sig='# PKG_CONFIG_WRAPPER_SIGNATURE: cross-os2emx'
+name='pkg-config'
+
+oldIFS="$IFS"
+IFS=":"
+
+for dir in $PATH; do
+  [ -n "$dir" ] || dir=.
+
+  prog="$dir/$name"
+
+  [ -r "$prog" ] || continue
+  [ -x "$prog" ] || continue
+
+  {
+      read -r _
+      read -r line
+  } < "$prog"
+
+  [ "$line" = "$sig" ] && continue
+
+  IFS="$oldIFS"
+
+  out=$("$prog" "$@");
+  rc=$?
+
+  printf '%s\n' "$out" | sed -E \
+    -e "s,(^|[[:blank:]])-I[[:blank:]]*/@unixroot/usr/include([[:blank:]]|$), ,g" \
+    -e "s,(^|[[:blank:]])-L[[:blank:]]*/@unixroot/usr/lib([[:blank:]]|$), ,g" \
+    -e "s,/@unixroot/,@PREFIX@/@TARGETSPEC@/,g"
+
+  exit $rc
+done
+
+IFS="$oldIFS"
+
+echo "$name: command not found" >&2
+exit 127

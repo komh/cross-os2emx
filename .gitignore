@@ -6,4 +6,5 @@ meson/meson-*
 meson/meson.done
 cmake/*.cmake
 extras/setemxenv
+extras/pkg-config
 .DS_store
