@@ -2,16 +2,44 @@
 
 set -e
 
+printlist()
+{
+  for e in "$@"; do
+    echo "    $e"
+  done
+}
+
 myname=$(basename $0)
 mydir=$(dirname $0)
 
-zipurl="$1"
-destdir="$2"
+opt_d=false
 
-if [ -z "$zipurl" ] ; then
-  echo "Usage: $myname URL_for_ZIP [destdir]"
+for p in "$@"; do
+  # destdir should be the last
+  if [ -n "$destdir" ]; then
+    packages=""
+    break
+  fi
+
+  case "$p" in
+    -d)
+      opt_d=true
+      ;;
+    *)
+      if $opt_d; then
+        destdir="$p"
+        opt_d=false
+      else
+        packages="$packages${packages:+ }$p"
+      fi
+      ;;
+  esac
+done
+
+if [ -z "$packages" ] || $opt_d ; then
+  echo "Usage: $myname URL_for_ZIP ... [-d destdir]"
   echo
-  echo "This will install the ZIP to destdir."
+  echo "This will install the ZIPs to destdir."
   echo "If destdir is omitted, destdir will be i686-pc-os2-emx of" \
        "the parent dir of"
   echo "the dir where $myname is. That is, dir/../i686-pc-os2-emx."
@@ -31,38 +59,43 @@ targetprefix=${destdir:-"$prefix/$target"}
 
 zipdir="$myname.zip.dir"
 
-zip=${zipurl##*/}
-zip=${zip%\?*}
-if [ "${zip%.zip}" = "$zip" ] ; then
-  zip="${zip}.zip"
-fi
+curlopts=""
+for zipurl in $packages; do
+  curlopts="$curlopts${curlopts:+ }-O $zipurl"
+done
 
-echo "Downloading ${zipurl}..."
-$CURL -o "$zip" "$zipurl"
+echo "Downloading the ZIPs..."
+printlist $packages
+zips=$($CURL -J -w "%{filename_effective}\n" $curlopts)
 
-echo "Unzipping $zip..."
-$UNZIP -u "$zip" -d "$zipdir"
+echo "Unzipping the ZIPs..."
+printlist $zips
+zipprefixes=""
+for zip in $zips; do
+  $UNZIP -u "$zip" -d "$zipdir"
 
-# find prefix of the ZIP
-zipprefix=""
-while read -r s d t p; do
-  case "$p" in
-    */bin/ | */include/ | */lib/ | */lib64/ | */share/)
-      zipprefix="/${p%/*/}"
-      break
-      ;;
-  esac
-done << EOF
+  # find prefix of the ZIP
+  while read -r s d t p; do
+    case "$p" in
+      */bin/ | */include/ | */lib/ | */lib64/ | */share/)
+        zipprefixes="$zipprefixes${zipprefixes:+ }/${p%/*/}"
+        break
+        ;;
+    esac
+  done << EOF
 $($UNZIP -qql "$zip")
 EOF
+done
 
-echo "Installing the unzipped file(s)..."
+echo "Installing the unzipped file(s) into $targetprefix..."
 $MKDIR_P "$targetprefix"
-for d in "$zipdir$zipprefix"/* ; do
-  if [ -d "$d" ] ; then
-    $CP -a "$d" "$targetprefix" || break
-  fi
+for zipprefix in $zipprefixes; do
+  for d in "$zipdir$zipprefix"/* ; do
+    if [ -d "$d" ] ; then
+      $CP -a "$d" "$targetprefix" || break
+    fi
+  done
 done
 
 echo "Cleaning up..."
-$RM -rf "$zip" "$zipdir"
+$RM -rf $zips "$zipdir"
