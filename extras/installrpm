@@ -136,14 +136,16 @@ targetprefix="${destdir:-$prefix/$target}"
 : ${CAT:=cat}
 : ${CPIO:=cpio}
 : ${CP:=cp}
-: ${RM:=rm}
+: ${RM:=rm -f}
 
 rpmarch=${rpmarch:-pentium4}
 rpmnoarch=noarch
 rpmarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmarch"
 rpmnoarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmnoarch"
-rpmlst="$myname.rpm.lst"
 rpmdir="$myname.rpm.dir"
+rpmlst="$rpmdir/$myname.rpm.lst"
+
+$MKDIR_P "$rpmdir"
 
 echo "Downloading the RPM file list..."
 $CURL "$rpmarchurl/" "$rpmnoarchurl/" \
@@ -177,20 +179,22 @@ done
 
 echo "Downloading the RPM(s)..."
 printlist $rpms
-$CURL $(echo "$rpmurls" | $SED -e "s, , -O ,g")
+$CURL --output-dir "$rpmdir" $(echo "$rpmurls" | $SED -e "s, , -O ,g")
 
 echo "Extracting the RPM(s)..."
 printlist $rpms
-$MKDIR_P "$rpmdir"
+saveddir="$PWD"
+cd "$rpmdir"
 for r in $rpms; do
-  rpm2cpio "$r" | (cd $rpmdir; $CPIO -idmv)
+  rpm2cpio "$r" | $CPIO -idmv
 done
+cd "$saveddir"
 
-echo "Installing the extracted file(s)..."
+echo "Installing the extracted file(s) to $targetprefix..."
 $MKDIR_P "$targetprefix"
 for d in "$rpmdir/@unixroot/usr"/* ; do
   $CP -a "$d" "$targetprefix" || break
 done
 
 echo "Cleaning up..."
-$RM -rf "$rpmlst" $rpms "$rpmdir"
+$RM -r "$rpmdir"

@@ -55,24 +55,26 @@ targetprefix=${destdir:-"$prefix/$target"}
 : ${UNZIP:=unzip}
 : ${MKDIR_P:=mkdir -p}
 : ${CP:=cp}
-: ${RM:=rm}
+: ${RM:=rm -f}
 
 zipdir="$myname.zip.dir"
 
+$MKDIR_P "$zipdir"
+
 curlopts=""
 for zipurl in $packages; do
-  curlopts="$curlopts${curlopts:+ }-O $zipurl"
+  curlopts="$curlopts${curlopts:+ }-O -J $zipurl"
 done
 
 echo "Downloading the ZIPs..."
 printlist $packages
-zips=$($CURL -J -w "%{filename_effective}\n" $curlopts)
+zips=$($CURL --clobber -w "%{filename_effective}\n" --output-dir "$zipdir" $curlopts)
 
 echo "Unzipping the ZIPs..."
 printlist $zips
 zipprefixes=""
 for zip in $zips; do
-  $UNZIP -u "$zip" -d "$zipdir"
+  $UNZIP -u "$zipdir/$zip" -d "$zipdir"
 
   # find prefix of the ZIP
   while read -r s d t p; do
@@ -83,7 +85,7 @@ for zip in $zips; do
         ;;
     esac
   done << EOF
-$($UNZIP -qql "$zip")
+$($UNZIP -qql "$zipdir/$zip")
 EOF
 done
 
@@ -98,4 +100,4 @@ for zipprefix in $zipprefixes; do
 done
 
 echo "Cleaning up..."
-$RM -rf $zips "$zipdir"
+$RM -r "$zipdir"
