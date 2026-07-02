@@ -58,11 +58,13 @@ targetprefix=${destdir:-"$prefix/$target"}
 : ${UNZIP:=unzip}
 : ${MKDIR_P:=mkdir -p}
 : ${CP:=cp}
-: ${RM:=rm}
+: ${RM:=rm -f}
 
 zipurl="https://rpm.netlabs.org/release/00/zip"
-ziplst="$myname.zip.lst"
 zipdir="$myname.zip.dir"
+ziplst="$zipdir/$myname.zip.lst"
+
+$MKDIR_P "$zipdir"
 
 echo "Downloading the ZIP file list..."
 $CURL "$zipurl/" \
@@ -92,19 +94,19 @@ done
 
 echo "Downloading the ZIP(s)..."
 printlist $zips
-$CURL $(echo "$zips" | $SED -e "s, , -O $zipurl/,g")
+$CURL --output-dir "$zipdir" $(echo "$zips" | $SED -e "s, , -O $zipurl/,g")
 
 echo "Unzipping the ZIP(s)..."
 printlist $zips
 for z in $zips; do
-  $UNZIP -u "$z" -d "$zipdir"
+  $UNZIP -u "$zipdir/$z" -d "$zipdir"
 done
 
-echo "Installing the unzipped file(s)..."
+echo "Installing the unzipped file(s) to $targetprefix..."
 $MKDIR_P "$targetprefix"
 for d in "$zipdir/@unixroot/usr"/* ; do
   $CP -a "$d" "$targetprefix" || break
 done
 
 echo "Cleaning up..."
-$RM -rf "$ziplst" $zips "$zipdir"
+$RM -r "$zipdir"
