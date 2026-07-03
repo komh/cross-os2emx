@@ -193,7 +193,7 @@ cd "$saveddir"
 echo "Installing the extracted file(s) to $targetprefix..."
 $MKDIR_P "$targetprefix"
 for d in "$rpmdir/@unixroot/usr"/* ; do
-  $CP -a "$d" "$targetprefix" || break
+  $CP -fa "$d" "$targetprefix" || break
 done
 
 echo "Cleaning up..."
