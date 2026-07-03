@@ -94,7 +94,7 @@ $MKDIR_P "$targetprefix"
 for zipprefix in $zipprefixes; do
   for d in "$zipdir$zipprefix"/* ; do
     if [ -d "$d" ] ; then
-      $CP -a "$d" "$targetprefix" || break
+      $CP -fa "$d" "$targetprefix" || break
     fi
   done
 done
