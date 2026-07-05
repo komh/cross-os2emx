@@ -74,7 +74,8 @@ echo "Unzipping the ZIPs..."
 printlist $zips
 zipprefixes=""
 for zip in $zips; do
-  $UNZIP -u "$zipdir/$zip" -d "$zipdir"
+  zip=${zip##*/}
+  $UNZIP -u "$zipdir/$zip" -d "$zipdir/$zip.dir"
 
   # find prefix of the ZIP
   while read -r s d t p; do
