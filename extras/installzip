@@ -81,7 +81,11 @@ for zip in $zips; do
   while read -r s d t p; do
     case "$p" in
       */bin/ | */include/ | */lib/ | */lib64/ | */share/)
-        zipprefixes="$zipprefixes${zipprefixes:+ }/${p%/*/}"
+        zipprefixes="$zipprefixes${zipprefixes:+ }/$zip.dir/${p%/*/}"
+        break
+        ;;
+      bin/ | include/ | lib/ | lib64/ | share/)
+        zipprefixes="$zipprefixes${zipprefixes:+ }/$zip.dir"
         break
         ;;
     esac
