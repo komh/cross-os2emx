@@ -24,13 +24,14 @@ for dir in $PATH; do
 
   IFS="$oldIFS"
 
-  out=$("$prog" "$@");
+  out=$("$prog" --define-prefix "$@");
   rc=$?
 
   printf '%s\n' "$out" | sed -E \
-    -e "s,(^|[[:blank:]])-I[[:blank:]]*/@unixroot/usr/include([[:blank:]]|$), ,g" \
-    -e "s,(^|[[:blank:]])-L[[:blank:]]*/@unixroot/usr/lib([[:blank:]]|$), ,g" \
-    -e "s,/@unixroot/,@PREFIX@/@TARGETSPEC@/,g"
+    -e "s,(^|[[:blank:]])-I[[:blank:]]*(@PREFIX@/@TARGETSPEC@|/@unixroot)?/usr(/local)?/include([[:blank:]]|$), ,g" \
+    -e "s,(^|[[:blank:]])-L[[:blank:]]*(/@unixroot)?/usr(/local)?/lib([[:blank:]]|$), ,g" \
+    -e "s,(^|[[:blank:]])-L[[:blank:]]*@PREFIX@/@TARGETSPEC@/usr/lib([[:blank:]]|$), ,g" \
+    -e "s,(^|[[:blank:]])(-I|-L)[[:blank:]]*(/@unixroot|(/usr))([[:blank:]/]|$), \2@PREFIX@/@TARGETSPEC@\4\5,g"
 
   exit $rc
 done
