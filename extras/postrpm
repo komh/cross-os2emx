@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+myname="$(basename "$0")"
+mydir="$(dirname "$0")"
+
+# assume we're in /opt/os2emx/bin directory
+prefix="$mydir/.."
+target=i686-pc-os2-emx
+targetprefix="${1:-$prefix/$target}"
+
+: ${SED:=sed}
+: ${CMP:=cmp -s}
+: ${RM:=rm -f}
+: ${MV:=mv}
+
+# patch os2medef.h
+os2medefh="$targetprefix/include/os2tk45/os2medef.h"
+
+if [ -f "$os2medefh" ]; then
+  printf '%s' "Patching $os2medefh..."
+  $SED -e 's,^typedef FAR \* LPTR;,typedef VOID FAR * LPTR;,g' \
+       -e 's,^typedef FAR \* LPRECT;,typedef RECTL FAR * LPRECT;,g' \
+       "$os2medefh" > "$os2medefh.tmp"
+  if $CMP "$os2medefh.tmp" "$os2medefh"; then
+    $RM "$os2medefh.tmp"
+    echo "Not needed"
+  else
+    $MV -f "$os2medefh.tmp" "$os2medefh"
+    echo "Done"
+  fi
+fi
