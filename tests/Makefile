@@ -63,7 +63,8 @@ test-autotools:
 
 install-lib:
 	if test ! -f $(TARGETINCDIR)/pthread.h \
-	   || test ! -f $(TARGETINCDIR)/os2tk45/os2.h ; then \
+	   || test ! -f $(TARGETINCDIR)/os2tk45/os2.h \
+	   || test ! -f $(TARGETINCDIR)/kai.h ; then \
 	  ./installlib.sh; \
 	fi
 
