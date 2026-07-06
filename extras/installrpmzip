@@ -57,7 +57,7 @@ targetprefix=${destdir:-"$prefix/$target"}
 : ${GREP:=grep}
 : ${UNZIP:=unzip}
 : ${MKDIR_P:=mkdir -p}
-: ${CP:=cp}
+: ${CP:=cp -v}
 : ${RM:=rm -f}
 
 zipurl="https://rpm.netlabs.org/release/00/zip"
