@@ -108,5 +108,8 @@ for d in "$zipdir/@unixroot/usr"/* ; do
   $CP -fa "$d" "$targetprefix" || break
 done
 
+echo "Postprocessing for the ZIP(s)..."
+postrpm "$targetprefix"
+
 echo "Cleaning up..."
 $RM -r "$zipdir"
