@@ -134,8 +134,8 @@ targetprefix="${destdir:-$prefix/$target}"
 : ${XZ:=xz}
 : ${ZSTD:=zstd}
 : ${CAT:=cat}
-: ${CPIO:=cpio}
-: ${CP:=cp}
+: ${CPIO:=cpio -v}
+: ${CP:=cp -v}
 : ${RM:=rm -f}
 
 rpmarch=${rpmarch:-pentium4}
@@ -186,7 +186,7 @@ printlist $rpms
 saveddir="$PWD"
 cd "$rpmdir"
 for r in $rpms; do
-  rpm2cpio "$r" | $CPIO -idmv
+  rpm2cpio "$r" | $CPIO -idm
 done
 cd "$saveddir"
 
