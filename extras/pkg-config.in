@@ -24,14 +24,18 @@ for dir in $PATH; do
 
   IFS="$oldIFS"
 
-  out=$("$prog" --define-prefix "$@");
+  out=$(PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 \
+        PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 \
+        "$prog" --define-prefix "$@");
   rc=$?
 
   printf '%s\n' "$out" | sed -E \
-    -e "s,(^|[[:blank:]])-I[[:blank:]]*(@PREFIX@/@TARGETSPEC@|/@unixroot)?/usr(/local)?/include([[:blank:]]|$), ,g" \
-    -e "s,(^|[[:blank:]])-L[[:blank:]]*(/@unixroot)?/usr(/local)?/lib([[:blank:]]|$), ,g" \
-    -e "s,(^|[[:blank:]])-L[[:blank:]]*@PREFIX@/@TARGETSPEC@/usr/lib([[:blank:]]|$), ,g" \
-    -e "s,(^|[[:blank:]])(-I|-L)[[:blank:]]*(/@unixroot|(/usr))([[:blank:]/]|$), \2@PREFIX@/@TARGETSPEC@\4\5,g"
+    -e ":loop" \
+    -e "s,(^|[[:blank:]])-I[[:blank:]]*(@PREFIX@/@TARGETSPEC@|/@unixroot)?(/usr(/local)?)?/include([[:blank:]]|$), ," \
+    -e "s,(^|[[:blank:]])-L[[:blank:]]*(/@unixroot)?(/usr(/local)?)?/lib([[:blank:]]|$), ," \
+    -e "s,(^|[[:blank:]])-L[[:blank:]]*@PREFIX@/@TARGETSPEC@(/usr)?/lib([[:blank:]]|$), ," \
+    -e "s,(^|[[:blank:]])(-I|-L)[[:blank:]]*(/@unixroot|(/usr))([[:blank:]/]|$), \2@PREFIX@/@TARGETSPEC@\4\5," \
+    -e "t loop"
 
   exit $rc
 done
