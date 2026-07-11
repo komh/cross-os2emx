@@ -56,6 +56,8 @@ EMXDIR := $(LIBCDIR)/src/emx
 EXTRASDIR := extras
 SETEMXENV := $(EXTRASDIR)/setemxenv
 PKGCONFIG := $(EXTRASDIR)/pkg-config
+LXLITESRC := $(EXTRASDIR)/$(SYSNAME)/lxLite
+LXLITEDST := $(EXTRASDIR)/$(SYSNAME)/lxlite
 
 MESONDIR := meson
 MESONVER := 1.11.1
@@ -167,6 +169,13 @@ $(PKGCONFIG): $(PKGCONFIG).in
 	$(SED) -e 's,@PREFIX@,$(PREFIX),g' -e 's,@TARGETSPEC@,$(TARGETSPEC),g' \
 	       < $< > $@
 	chmod +x $@
+
+ifeq ($(SYSNAME),Linux)
+all-extras: $(LXLITEDST)
+
+$(LXLITEDST): $(LXLITESRC)
+	$(LN_S) -f $(notdir $(LXLITESRC)) $(LXLITEDST)
+endif
 
 .PHONY: all-gcc
 all: all-gcc
