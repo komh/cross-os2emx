@@ -4,6 +4,7 @@ cpp = '@TARGETSPEC@-g++'
 ar = '@TARGETSPEC@-emxomfar'
 windres = '@TARGETSPEC@-windres'
 strip = '@TARGETSPEC@-strip'
+pkg-config = '@TARGETSPEC@-pkg-config'
 
 [host_machine]
 system = 'os/2'
