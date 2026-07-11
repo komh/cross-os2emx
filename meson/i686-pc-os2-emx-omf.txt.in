@@ -5,6 +5,8 @@ ar = '@TARGETSPEC@-emxomfar'
 windres = '@TARGETSPEC@-windres'
 strip = '@TARGETSPEC@-strip'
 pkg-config = '@TARGETSPEC@-pkg-config'
+# dummy exe wrapper
+exe_wrapper = 'true'
 
 [host_machine]
 system = 'os/2'
