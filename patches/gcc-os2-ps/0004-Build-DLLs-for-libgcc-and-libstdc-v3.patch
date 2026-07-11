@@ -1,7 +1,7 @@
-From 93149537ea8b09a7c7228e0bac8f70922b7a387e Mon Sep 17 00:00:00 2001
+From 54dff448f3fe4a300d6b5b38489fb717213c0e7c Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Thu, 19 Mar 2026 23:34:08 +0900
-Subject: [PATCH 4/9] Build DLLs for libgcc and libstdc++-v3
+Subject: [PATCH 04/10] Build DLLs for libgcc and libstdc++-v3
 
 ---
  conf-cross-os2emx            |  2 +-

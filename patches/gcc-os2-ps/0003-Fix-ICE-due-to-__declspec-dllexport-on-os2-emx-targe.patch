@@ -1,7 +1,8 @@
-From 1e32f50407ffd412bab340e8990045221124babd Mon Sep 17 00:00:00 2001
+From ba5c830b57574aac82d2ee47acee6273a8a17674 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sat, 28 Feb 2026 00:07:14 +0900
-Subject: [PATCH 3/9] Fix ICE due to __declspec(dllexport) on *-os2-emx target
+Subject: [PATCH 03/10] Fix ICE due to __declspec(dllexport) on *-os2-emx
+ target
 
 ---
  gcc/config/i386/emx.c | 5 +++++

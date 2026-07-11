@@ -1,7 +1,7 @@
-From 5ed84d4538ff7b5964f6c35d2e96763fecffe0c8 Mon Sep 17 00:00:00 2001
+From ce0808879e8bad6abbeb894faaaa6d119859fd20 Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Sun, 1 Mar 2026 18:34:46 +0900
-Subject: [PATCH 5/9] Build libssp
+Subject: [PATCH 05/10] Build libssp
 
 ---
  conf-cross-os2emx | 1 -

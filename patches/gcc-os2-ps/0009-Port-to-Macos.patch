@@ -1,7 +1,7 @@
-From 53212cb4249391cbc6b5308c3ecce654b730bf6b Mon Sep 17 00:00:00 2001
+From e8ce3a83975c803bc0a953a1825d2a507806021b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Jochen=20Sch=C3=A4fer?= <josch1710@live.de>
 Date: Wed, 8 Apr 2026 09:02:57 +0200
-Subject: [PATCH 9/9] Port to Macos
+Subject: [PATCH 09/10] Port to Macos
 
 1. conf-cross-os2emx: Remove TARGET_OS_MAC from compilation
 
