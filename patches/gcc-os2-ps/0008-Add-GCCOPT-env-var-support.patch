@@ -1,7 +1,7 @@
-From 970180fa06e28628446d61a1544c1435f74074bf Mon Sep 17 00:00:00 2001
+From 53fe9855655fc1ba75148fa9f764f462b078967c Mon Sep 17 00:00:00 2001
 From: KO Myung-Hun <komh78@gmail.com>
 Date: Wed, 1 Apr 2026 23:47:55 +0900
-Subject: [PATCH 8/9] Add GCCOPT env var support
+Subject: [PATCH 08/10] Add GCCOPT env var support
 
 ---
  gcc/gcc.cc | 44 +++++++++++++++++++++++++++++++++++++++++++-

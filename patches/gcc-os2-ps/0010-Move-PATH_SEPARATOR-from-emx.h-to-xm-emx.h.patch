@@ -1,0 +1,41 @@
+From c3d10af358d1303ca0572aa8e1be611194e815fa Mon Sep 17 00:00:00 2001
+From: KO Myung-Hun <komh78@gmail.com>
+Date: Sat, 11 Jul 2026 20:21:43 +0900
+Subject: [PATCH 10/10] Move PATH_SEPARATOR from emx.h to xm-emx.h
+
+This fixes that PATH_SEPARATOR is set to ';' on non-OS/2.
+---
+ gcc/config/i386/emx.h    | 4 ----
+ gcc/config/i386/xm-emx.h | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/i386/emx.h b/gcc/config/i386/emx.h
+index 2803407350..4eef9925dc 100644
+--- a/gcc/config/i386/emx.h
++++ b/gcc/config/i386/emx.h
+@@ -30,10 +30,6 @@ Boston, MA 02111-1307, USA.  */
+ # define EMX
+ #endif
+ 
+-/* Directories in path environment variables are separated by semicolons. */
+-#undef PATH_SEPARATOR
+-#define PATH_SEPARATOR          ';'
+-
+ /* We do want to add an underscore to the front of each user symbol. */
+ #define YES_UNDERSCORES
+ 
+diff --git a/gcc/config/i386/xm-emx.h b/gcc/config/i386/xm-emx.h
+index d66a46df51..e4e5c74e1a 100644
+--- a/gcc/config/i386/xm-emx.h
++++ b/gcc/config/i386/xm-emx.h
+@@ -19,3 +19,7 @@ along with GCC; see the file COPYING3.  If not see
+ <http://www.gnu.org/licenses/>.  */
+ 
+ #define HOST_EXECUTABLE_SUFFIX ".exe"
++
++/* Directories in path environment variables are separated by semicolons. */
++#undef PATH_SEPARATOR
++#define PATH_SEPARATOR ';'
+-- 
+2.43.0
+
