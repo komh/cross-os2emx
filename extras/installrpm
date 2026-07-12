@@ -155,6 +155,29 @@ $CURL "$rpmarchurl/" "$rpmnoarchurl/" \
 echo "Checking the package(s)..."
 printlist $packages
 for package in $packages; do
+  case "$package" in
+    *://*)
+      # add URLs
+      rpms="$rpms $package"
+      curlopts="$curlopts${curlopts:+ }-O -J $package"
+      continue
+      ;;
+    *)
+      if [ -f "$package" ]; then
+        # add local files
+        p="$package"
+        if [ -n "${p##/*}" ]; then
+          # relative path
+          p="$(pwd)/$p"
+        fi
+        p="file://$p"
+        rpms="$rpms $p"
+        curlopts="$curlopts${curlopts:+ }-O -J $p"
+        continue
+      fi
+      ;;
+  esac
+
   # normalize package
   r="${package%.oc00*}"
   r="$r.oc00"
@@ -171,15 +194,16 @@ for package in $packages; do
 
   rpms="$rpms $r"
   if [ "${r%.$rpmarch*}" != "$r" ] ; then
-    rpmurls="$rpmurls $rpmarchurl/$r"
+    curlopts="$curlopts${curlopts:+ }-O -J $rpmarchurl/$r"
   else
-    rpmurls="$rpmurls $rpmnoarchurl/$r"
+    curlopts="$curlopts${curlopts:+ }-O -J $rpmnoarchurl/$r"
   fi
 done
 
 echo "Downloading the RPM(s)..."
 printlist $rpms
-$CURL --output-dir "$rpmdir" $(echo "$rpmurls" | $SED -e "s, , -O ,g")
+rpms="$($CURL --clobber -w "%{filename_effective}\n" --output-dir "$rpmdir" $curlopts \
+        | $SED "s,$rpmdir/,,g")"
 
 echo "Extracting the RPM(s)..."
 printlist $rpms

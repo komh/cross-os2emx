@@ -74,6 +74,29 @@ $CURL "$zipurl/" \
 echo "Checking the package(s)..."
 printlist $packages
 for package in $packages; do
+  case "$package" in
+    *://*)
+      # add URLs
+      zips="$zips $package"
+      curlopts="$curlopts${curlopts:+ }-O -J $package"
+      continue
+      ;;
+    *)
+      if [ -f "$package" ]; then
+        # add local files
+        p="$package"
+        if [ -n "${p##/*}" ]; then
+          # relative path
+          p="$(pwd)/$p"
+        fi
+        p="file://$p"
+        zips="$zips $p"
+        curlopts="$curlopts${curlopts:+ }-O -J $p"
+        continue
+      fi
+      ;;
+  esac
+
   # normalize package
   z=${package%.zip}
   z=${z%_oc00}
@@ -90,11 +113,13 @@ for package in $packages; do
   fi
 
   zips="$zips $z"
+  curlopts="$curlopts${curlopts:+ }-O -J $zipurl/$z"
 done
 
 echo "Downloading the ZIP(s)..."
 printlist $zips
-$CURL --output-dir "$zipdir" $(echo "$zips" | $SED -e "s, , -O $zipurl/,g")
+zips="$($CURL --clobber -w "%{filename_effective}\n" --output-dir "$zipdir" $curlopts \
+        | $SED "s,$zipdir/,,g")"
 
 echo "Unzipping the ZIP(s)..."
 printlist $zips

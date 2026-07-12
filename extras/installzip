@@ -52,6 +52,7 @@ target=i686-pc-os2-emx
 targetprefix=${destdir:-"$prefix/$target"}
 
 : ${CURL:=curl -sSfL}
+: ${SED:=sed -E}
 : ${UNZIP:=unzip}
 : ${MKDIR_P:=mkdir -p}
 : ${CP:=cp -v}
@@ -63,18 +64,35 @@ $MKDIR_P "$zipdir"
 
 curlopts=""
 for zipurl in $packages; do
+  case "$zipurl" in
+    *://*)
+      ;;
+    *)
+      if [ -f "$zipurl" ]; then
+        # add local files
+        z="$zipurl"
+        if [ -n "${z##/*}" ]; then
+          # relative path
+          z="$(pwd)/$z"
+        fi
+        zipurl="file://$z"
+      fi
+      ;;
+  esac
+
+  zipurls="$zipurls${zipurls:+ }$zipurl"
   curlopts="$curlopts${curlopts:+ }-O -J $zipurl"
 done
 
 echo "Downloading the ZIPs..."
-printlist $packages
-zips=$($CURL --clobber -w "%{filename_effective}\n" --output-dir "$zipdir" $curlopts)
+printlist $zipurls
+zips="$($CURL --clobber -w "%{filename_effective}\n" --output-dir "$zipdir" $curlopts \
+        | $SED "s,$zipdir/,,g")"
 
 echo "Unzipping the ZIPs..."
 printlist $zips
 zipprefixes=""
 for zip in $zips; do
-  zip=${zip##*/}
   $UNZIP -u "$zipdir/$zip" -d "$zipdir/$zip.dir"
 
   # find prefix of the ZIP
