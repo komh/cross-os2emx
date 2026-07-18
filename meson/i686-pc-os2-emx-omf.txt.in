@@ -1,10 +1,16 @@
+[constants]
+prefix = '@PREFIX@'
+target = '@TARGETSPEC@'
+targetprefix = prefix / target
+
 [binaries]
-c = '@TARGETSPEC@-gcc'
-cpp = '@TARGETSPEC@-g++'
-ar = '@TARGETSPEC@-emxomfar'
-windres = '@TARGETSPEC@-windres'
-strip = '@TARGETSPEC@-strip'
-pkg-config = '@TARGETSPEC@-pkg-config'
+c = target + '-gcc'
+cpp = target + '-g++'
+ar = target + '-emxomfar'
+windres = target + '-windres'
+# only working on the executables such as .exe and .dll
+strip = target + '-emxomfstrip'
+pkg-config = target + '-pkg-config'
 # dummy exe wrapper
 exe_wrapper = 'true'
 
@@ -15,9 +21,9 @@ cpu = '@TARGETCPU@'
 endian = 'little'
 
 [properties]
-sys_root = '@PREFIX@'
-pkg_config_libdir = '@PREFIX@/@TARGETSPEC@/lib/pkgconfig'
+sys_root = targetprefix
+pkg_config_libdir = targetprefix / 'lib/pkgconfig'
 
 [built-in options]
-c_args = ['-idirafter', '@PREFIX@/@TARGETSPEC@/include/os2tk45']
-cpp_args = ['-idirafter', '@PREFIX@/@TARGETSPEC@/include/os2tk45']
+c_args = ['-idirafter', targetprefix / 'include/os2tk45']
+cpp_args = ['-idirafter', targetprefix / 'include/os2tk45']
