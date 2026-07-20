@@ -20,6 +20,8 @@ dir="${1:-$(dirname "$0")/..}"
 : ${EMXOMF:=emxomf -s -l -q -p 256}
 : ${TOUCH:=touch -r}
 
+echo "Generating .lib from .a in \`$dir' recursively..."
+
 find "$dir" -name '*.a' | while IFS= read -r libaout
 do
   libomf="${libaout%.a}.lib"
