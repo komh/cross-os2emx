@@ -73,6 +73,7 @@ mydir=$(dirname $0)
 
 opt_a=false
 opt_d=false
+opt_e=false
 
 for p in "$@"; do
   # destdir should be the last
@@ -87,6 +88,9 @@ for p in "$@"; do
       ;;
     -d)
       opt_d=true
+      ;;
+    -e)
+      opt_e=true
       ;;
     *)
       if $opt_a; then
@@ -103,10 +107,11 @@ for p in "$@"; do
 done
 
 if [ -z "$packages" ] || $opt_a || $opt_d ; then
-  echo "Usage: $myname package[.oc00[.arch[.rpm]]] ... [-a arch] [-d destdir]"
+  echo "Usage: $myname package[.oc00[.arch[.rpm]]] ... [-e] [-a arch] [-d destdir]"
   echo
   echo "This will install package[.oc00[.arch[.rpm]]] to destdir without"\
        "checking dependencies."
+  echo "If -e is given, experimental repo will be searched, too."
   echo "arch should be one of noarch, i386, i686 and pentium4."
   echo "If -a arch is omitted, arch will be penitum4." \
        "i386, i686 and pentium4 available."
@@ -142,6 +147,8 @@ rpmarch=${rpmarch:-pentium4}
 rpmnoarch=noarch
 rpmarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmarch"
 rpmnoarchurl="https://rpm.netlabs.org/release/00/pentium4/$rpmnoarch"
+rpmexparchurl="https://rpm.netlabs.org/experimental/00/i386/$rpmarch"
+rpmexpnoarchurl="https://rpm.netlabs.org/experimental/00/i386/$rpmnoarch"
 rpmdir="$myname.rpm.dir"
 rpmlst="$rpmdir/$myname.rpm.lst"
 
@@ -149,8 +156,15 @@ $MKDIR_P "$rpmdir"
 
 echo "Downloading the RPM file list..."
 $CURL "$rpmarchurl/" "$rpmnoarchurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1/p" \
-  | $SORT -V > "$rpmlst"
+  | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1@@@rel@@@/p" > "$rpmlst.tmp"
+
+if $opt_e; then
+  $CURL "$rpmexparchurl/" "$rpmexpnoarchurl/" \
+    | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1@@@exp@@@/p" >> "$rpmlst.tmp"
+fi
+
+$SORT -V < "$rpmlst.tmp" > "$rpmlst"
+$RM "$rpmlst.tmp"
 
 echo "Checking the package(s)..."
 printlist $packages
@@ -192,12 +206,25 @@ for package in $packages; do
     [ -n "$r" ] || { echo "Package '$package' not found!"; exit 1; }
   fi
 
+  case "$r" in
+    *"$rpmarch.rpm@@@rel@@@")
+      rpmurl="$rpmarchurl"
+      ;;
+    *"$rpmnoarch.rpm@@@rel@@@")
+      rpmurl="$rpmnoarchurl"
+      ;;
+    *"$rpmarch.rpm@@@exp@@@")
+      rpmurl="$rpmexparchurl"
+      ;;
+    *"$rpmnoarch.rpm@@@exp@@@")
+      rpmurl="$rpmexpnoarchurl"
+      ;;
+  esac
+
+  r="${r%@@@rel@@@}"
+  r="${r%@@@exp@@@}"
   rpms="$rpms $r"
-  if [ "${r%.$rpmarch*}" != "$r" ] ; then
-    curlopts="$curlopts${curlopts:+ }-O -J $rpmarchurl/$r"
-  else
-    curlopts="$curlopts${curlopts:+ }-O -J $rpmnoarchurl/$r"
-  fi
+  curlopts="$curlopts${curlopts:+ }-O -J $rpmurl/$r"
 done
 
 echo "Downloading the RPM(s)..."

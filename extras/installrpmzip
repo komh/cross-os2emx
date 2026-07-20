@@ -13,6 +13,7 @@ myname=$(basename $0)
 mydir=$(dirname $0)
 
 opt_d=false
+opt_e=false
 
 for p in "$@"; do
   # destdir should be the last
@@ -24,6 +25,9 @@ for p in "$@"; do
   case "$p" in
     -d)
       opt_d=true
+      ;;
+    -e)
+      opt_e=true
       ;;
     *)
       if $opt_d; then
@@ -37,9 +41,10 @@ for p in "$@"; do
 done
 
 if [ -z "$packages" ] || $opt_d ; then
-  echo "Usage: $myname package[_oc00[.zip]] ... [-d destdir]"
+  echo "Usage: $myname package[_oc00[.zip]] ... [-e] [-d destdir]"
   echo
   echo "This will install package[_oc00[.zip] to destdir."
+  echo "If -e is given, experimental repo will be searched, too."
   echo "If destdir is omitted, destdir will be i686-pc-os2-emx of" \
        "the parent dir of"
   echo "the dir where $myname is. That is, dir/../i686-pc-os2-emx."
@@ -61,6 +66,7 @@ targetprefix=${destdir:-"$prefix/$target"}
 : ${RM:=rm -f}
 
 zipurl="https://rpm.netlabs.org/release/00/zip"
+zipexpurl="https://rpm.netlabs.org/experimental/00/zip"
 zipdir="$myname.zip.dir"
 ziplst="$zipdir/$myname.zip.lst"
 
@@ -68,8 +74,15 @@ $MKDIR_P "$zipdir"
 
 echo "Downloading the ZIP file list..."
 $CURL "$zipurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1/p" \
-  | $SORT -V > "$ziplst"
+  | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1@@@rel@@@/p" > "$ziplst.tmp"
+
+if $opt_e; then
+  $CURL "$zipexpurl/" \
+    | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1@@@exp@@@/p" >> "$ziplst.tmp"
+fi
+
+$SORT -V < "$ziplst.tmp" > "$ziplst"
+$RM "$ziplst.tmp"
 
 echo "Checking the package(s)..."
 printlist $packages
@@ -112,8 +125,20 @@ for package in $packages; do
     [ -n "$z" ] || { echo "Package '$package' not found!"; exit 1; }
   fi
 
+  case "$z" in
+    *.zip@@@rel@@@)
+      zurl="$zipurl"
+      ;;
+
+    *.zip@@@exp@@@)
+      zurl="$zipexpurl"
+      ;;
+  esac
+
+  z="${z%@@@rel@@@}"
+  z="${z%@@@exp@@@}"
   zips="$zips $z"
-  curlopts="$curlopts${curlopts:+ }-O -J $zipurl/$z"
+  curlopts="$curlopts${curlopts:+ }-O -J $zurl/$z"
 done
 
 echo "Downloading the ZIP(s)..."
