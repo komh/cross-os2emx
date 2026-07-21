@@ -156,7 +156,8 @@ $MKDIR_P "$rpmdir"
 
 echo "Downloading the RPM file list..."
 $CURL "$rpmarchurl/" "$rpmnoarchurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1@@@rel@@@/p" > "$rpmlst.tmp"
+  | $SED -n -e "s/^.*href=\"\(.*\.rpm\)\".*$/\1@@@rel@@@/" \
+            -e "/^pthread.*-20[0-9]*-[0-9][0-9]*[-_.].*$/!p" > "$rpmlst.tmp"
 
 if $opt_e; then
   $CURL "$rpmexparchurl/" "$rpmexpnoarchurl/" \
