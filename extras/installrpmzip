@@ -74,7 +74,8 @@ $MKDIR_P "$zipdir"
 
 echo "Downloading the ZIP file list..."
 $CURL "$zipurl/" \
-  | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1@@@rel@@@/p" > "$ziplst.tmp"
+  | $SED -n -e "s/^.*href=\"\(.*\.zip\)\".*$/\1@@@rel@@@/" \
+            -e "/^pthread.*-20[0-9]*-[0-9][0-9]*[-_.].*$/!p" > "$ziplst.tmp"
 
 if $opt_e; then
   $CURL "$zipexpurl/" \
