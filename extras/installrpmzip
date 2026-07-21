@@ -84,14 +84,52 @@ fi
 $SORT -V < "$ziplst.tmp" > "$ziplst"
 $RM "$ziplst.tmp"
 
+addpackage()
+{
+  z="${1%@@@rel@@@}"
+  z="${z%@@@exp@@@}"
+  zips="$zips $z"
+
+  case "$1" in
+    *".zip@@@rel@@@")
+      z="$zipurl/$z"
+      ;;
+    *".zip@@@exp@@@")
+      z="$zipexpurl/$z"
+      ;;
+  esac
+
+  curlopts="$curlopts${curlopts:+ }-O -J $z"
+  return 0
+}
+
 echo "Checking the package(s)..."
 printlist $packages
 for package in $packages; do
   case "$package" in
     *://*)
       # add URLs
-      zips="$zips $package"
-      curlopts="$curlopts${curlopts:+ }-O -J $package"
+      addpackage "$package"
+      continue
+      ;;
+    *'*'* | *'?'*)
+      pname=""
+      z=""
+      while read -r l; do
+        case "$l" in
+          $package)
+            pn=$(echo "$l" | $SED 's/[-_.][0-9][0-9]*[-_.].*//')
+            if [ "$pname" != "$pn" ]; then
+              [ -z "$pname" ] || addpackage "$z"
+              pname="$pn"
+            fi
+            z="$l"
+            ;;
+        esac
+      done < "$ziplst"
+      [ -n "$pname" ] || { echo "Package '$package' not found!"; exit 1; }
+
+      addpackage "$z"
       continue
       ;;
     *)
@@ -103,8 +141,7 @@ for package in $packages; do
           p="$(pwd)/$p"
         fi
         p="file://$p"
-        zips="$zips $p"
-        curlopts="$curlopts${curlopts:+ }-O -J $p"
+        addpackage "$p"
         continue
       fi
       ;;
@@ -125,20 +162,7 @@ for package in $packages; do
     [ -n "$z" ] || { echo "Package '$package' not found!"; exit 1; }
   fi
 
-  case "$z" in
-    *.zip@@@rel@@@)
-      zurl="$zipurl"
-      ;;
-
-    *.zip@@@exp@@@)
-      zurl="$zipexpurl"
-      ;;
-  esac
-
-  z="${z%@@@rel@@@}"
-  z="${z%@@@exp@@@}"
-  zips="$zips $z"
-  curlopts="$curlopts${curlopts:+ }-O -J $zurl/$z"
+  addpackage "$z"
 done
 
 echo "Downloading the ZIP(s)..."
