@@ -166,14 +166,58 @@ fi
 $SORT -V < "$rpmlst.tmp" > "$rpmlst"
 $RM "$rpmlst.tmp"
 
+addpackage()
+{
+  r="${1%@@@rel@@@}"
+  r="${r%@@@exp@@@}"
+  rpms="$rpms $r"
+
+  case "$1" in
+    *"$rpmarch.rpm@@@rel@@@")
+      r="$rpmarchurl/$r"
+      ;;
+    *"$rpmnoarch.rpm@@@rel@@@")
+      r="$rpmnoarchurl/$r"
+      ;;
+    *"$rpmarch.rpm@@@exp@@@")
+      r="$rpmexparchurl/$r"
+      ;;
+    *"$rpmnoarch.rpm@@@exp@@@")
+      r="$rpmexpnoarchurl/$r"
+      ;;
+  esac
+
+  curlopts="$curlopts${curlopts:+ }-O -J $r"
+  return 0
+}
+
 echo "Checking the package(s)..."
 printlist $packages
 for package in $packages; do
   case "$package" in
     *://*)
       # add URLs
-      rpms="$rpms $package"
-      curlopts="$curlopts${curlopts:+ }-O -J $package"
+      addpackage "$package"
+      continue
+      ;;
+    *'*'* | *'?'*)
+      pname=""
+      r=""
+      while read -r l; do
+        case "$l" in
+          $package)
+            pn=$(echo "$l" | $SED 's/[-_.][0-9][0-9]*[-_.].*//')
+            if [ "$pname" != "$pn" ]; then
+              [ -z "$pname" ] || addpackage "$r"
+              pname="$pn"
+            fi
+            r="$l"
+            ;;
+        esac
+      done < "$rpmlst"
+      [ -n "$pname" ] || { echo "Package '$package' not found!"; exit 1; }
+
+      addpackage "$r"
       continue
       ;;
     *)
@@ -185,8 +229,7 @@ for package in $packages; do
           p="$(pwd)/$p"
         fi
         p="file://$p"
-        rpms="$rpms $p"
-        curlopts="$curlopts${curlopts:+ }-O -J $p"
+        addpackage "$p"
         continue
       fi
       ;;
@@ -206,25 +249,7 @@ for package in $packages; do
     [ -n "$r" ] || { echo "Package '$package' not found!"; exit 1; }
   fi
 
-  case "$r" in
-    *"$rpmarch.rpm@@@rel@@@")
-      rpmurl="$rpmarchurl"
-      ;;
-    *"$rpmnoarch.rpm@@@rel@@@")
-      rpmurl="$rpmnoarchurl"
-      ;;
-    *"$rpmarch.rpm@@@exp@@@")
-      rpmurl="$rpmexparchurl"
-      ;;
-    *"$rpmnoarch.rpm@@@exp@@@")
-      rpmurl="$rpmexpnoarchurl"
-      ;;
-  esac
-
-  r="${r%@@@rel@@@}"
-  r="${r%@@@exp@@@}"
-  rpms="$rpms $r"
-  curlopts="$curlopts${curlopts:+ }-O -J $rpmurl/$r"
+  addpackage "$r"
 done
 
 echo "Downloading the RPM(s)..."
