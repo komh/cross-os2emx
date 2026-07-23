@@ -18,6 +18,23 @@ Tested hosts:
 
 # History
 
+* cross-os2emx v1.4.0 (2026/07/23)
+    * Added `installzip` to install non-RPM ZIPs
+    * Added `installrpm` to install RPMs
+    * Added `PKG_CONFIG_LIBDIR` and `ACLOCAL_PATH` to `setemxenv`
+    * Added `pkg-config` wrapper script
+    * Added the patch work for `os2tk45/os2medef.h`
+    * Added `pkg-config`, `exe_wrapper` to meson cross files
+    * Added `omflibs` to convert multiple .a to .lib
+    * Linux: Removed `lxlite` file from repo for OSes with case-insensitive file systems such as macOS. Issue #59. Reported by @dmik
+    * Improved `installrpmzip`
+        * Added support of partial package name and multiple packages
+        * Added support of URLs and local files
+        * Added `-e` option to support experimental repo
+    * Fixed path separator of `gcc`
+    * Fixed `sys_root` of meson cross files
+    * Fixed misc.
+
 * cross-os2emx v1.3.1 (2026/06/20)
     * Fixed `c_args` and `cpp_args` of `meson` is in `[properties]` section not in `[built-in options]` section.
 
@@ -152,12 +169,52 @@ export AR=i686-pc-os2-emx-emxomfar
 
 1. Find the necessary libs at https://rpm.netlabs.org/release/00/zip
 
-2. Copy the package name including `.zip` not the URL
+2. Copy the package name or the URL
 
 3. Execute `installrpmzip` with the package name. For example, if you want to install pthread:
 ```
     /path/to/opt/os2emx/bin/installrpmzip pthread-0_2_6-1_oc00.zip
 ```
+
+4. Local files are supported.
+
+5. Leading partial name or wildcards such as '*', '?' are supported:
+```
+    /path/to/opt/os2emx/bin/installrpmzip pthread-0_2_6
+    /path/to/opt/os2emx/bin/installrpmzip pthread-*
+```
+If the matched packages are many, only the latest version is installed out of the matched packages with the same package name excluding version info.
+
+# How to install additional libs with `installrpm`
+
+1. Find the necessary libs at https://rpm.netlabs.org/release/00/pentium4/pentium4/
+
+2. Copy the package name or the URL
+
+3. Execute `installrpm` with the package name. For example, if you want to install pthread:
+```
+    /path/to/opt/os2emx/bin/installrpm pthread-devel-0.2.6-1.oc00.pentium4.rpm
+```
+
+4. Local files are supported
+
+5. Leading partial name or wildcards such as '*', '?' are supported:
+```
+    /path/to/opt/os2emx/bin/installrpm pthread-devel-0.2.6
+    /path/to/opt/os2emx/bin/installrpm pthread-devel-0*
+```
+If the matched packages are many, only the latest version is installed out of the matched packages with the same package name excluding version info.
+
+# How to install additional libs with `installzip`
+
+1. Execute `installzip` with the URL:
+```
+  /path/to/opt/os2emx/bin/installzip URL-for-zip
+```
+
+2. Local files are supported
+
+3. The zip file should have /lib, /include directory.
 
 # How to build
 
