@@ -241,7 +241,7 @@ for package in $packages; do
   r="$r.oc00"
 
   # find the exact match first
-  r=$($GREP "^$r\.\($rpmarch\|$rpmnoarch\)\.rpm$" $rpmlst) || :
+  r=$($GREP "^$r\.\($rpmarch\|$rpmnoarch\)\.rpm@@@\(rel\|exp\)@@@$" $rpmlst) || :
 
   if [ -z "$r" ]; then
     # find the latest version with $package package name

@@ -154,7 +154,7 @@ for package in $packages; do
   z="${z}_oc00.zip"
 
   # find the exact match first
-  z=$($GREP "^$z$" $ziplst) || :
+  z=$($GREP "^$z@@@\(rel\|exp\)@@@$" $ziplst) || :
 
   if [ -z "$z" ]; then
     # find the latest version with $package package name
