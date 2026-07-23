@@ -11,15 +11,19 @@ set(CMAKE_CXX_COMPILER @PREFIX@/bin/@TARGETSPEC@-g++)
 # the path to be passed to the compiler and the linker in the --sysroot flag
 set(CMAKE_SYSROOT @PREFIX@/@TARGETSPEC@)
 
-# where is the target environment located
-set(CMAKE_FIND_ROOT_PATH ${CMAKE_SYSROOT})
+# the installation prefixes to be searched by command find_package(), find_program(), find_library(), find_file(), and find_path() commands
+list(APPEND CMAKE_SYSTEM_PREFIX_PATH "${CMAKE_SYSROOT}")
 
 # where is the target environment located
+set(CMAKE_FIND_ROOT_PATH "${CMAKE_SYSROOT}")
+
+# ignore programs in the target environment
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 
-# search headers and libraries in the target environment
+# search libraries, headers, and packages only in the target environment
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 # append include path for os2tk45
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -idirafter ${CMAKE_SYSROOT}/include/os2tk45")
